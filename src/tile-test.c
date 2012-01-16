@@ -20,6 +20,7 @@
 
 #include "grits-util.h"
 #include "data/grits-wms.h"
+#include "data/grits-tms.h"
 #include "objects/grits-tile.h"
 
 struct CacheState {
@@ -98,6 +99,32 @@ gpointer do_osm_cache(gpointer _image)
 	return NULL;
 }
 
+gpointer do_osm2_cache(gpointer _image)
+{
+	GtkImage *image = _image;
+	g_message("Creating osm2 tile");
+	GritsTile *tile = grits_tile_new(NULL, 85.0511, -85.0511, EAST, WEST);
+	tile->children[0][1] = grits_tile_new(tile, 85.0511, 0, 0, WEST);
+	tile = tile->children[0][1];
+
+	g_message("Fetching osm2 image");
+	GritsTms *osm2_tms = grits_tms_new("http://tile.openstreetmap.org",
+			"tms_test/", "png");
+	const char *path = grits_tms_fetch(osm2_tms, tile, GRITS_ONCE, NULL, NULL);
+
+	g_message("Loading osm2 image: [%s]", path);
+	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(path, NULL);
+	gdk_threads_enter();
+	gtk_image_set_from_pixbuf(GTK_IMAGE(image), pixbuf);
+	gdk_threads_leave();
+
+	g_message("Cleaning osm2 up");
+	grits_tms_free(osm2_tms);
+	grits_tile_free(tile, NULL, NULL);
+	return NULL;
+}
+
+
 gboolean key_press_cb(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
 	if (event->keyval == GDK_q)
@@ -119,12 +146,14 @@ int main(int argc, char **argv)
 	GtkWidget *bmng_image = gtk_image_new();
 	GtkWidget *srtm_image = gtk_image_new();
 	GtkWidget *osm_image  = gtk_image_new();
+	GtkWidget *osm2_image = gtk_image_new();
 	gtk_container_add(GTK_CONTAINER(win), vbox1);
 	gtk_box_pack_start(GTK_BOX(vbox1), scroll, TRUE, TRUE, 0);
 	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scroll), vbox2);
 	gtk_box_pack_start(GTK_BOX(vbox2), bmng_image, TRUE, TRUE, 0);
 	gtk_box_pack_start(GTK_BOX(vbox2), srtm_image, TRUE, TRUE, 0);
 	gtk_box_pack_start(GTK_BOX(vbox2), osm_image,  TRUE, TRUE, 0);
+	gtk_box_pack_start(GTK_BOX(vbox2), osm2_image, TRUE, TRUE, 0);
 	gtk_box_pack_start(GTK_BOX(vbox1), status, FALSE, FALSE, 0);
 	g_signal_connect(win, "key-press-event", G_CALLBACK(key_press_cb), NULL);
 	g_signal_connect(win, "destroy", gtk_main_quit, NULL);
@@ -133,6 +162,7 @@ int main(int argc, char **argv)
 
 	g_thread_create(do_bmng_cache, bmng_image, FALSE, NULL);
 	g_thread_create(do_osm_cache,  osm_image,  FALSE, NULL);
+	g_thread_create(do_osm2_cache, osm2_image, FALSE, NULL);
 
 	gtk_widget_show_all(win);
 	gtk_main();

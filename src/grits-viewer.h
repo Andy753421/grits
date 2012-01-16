@@ -38,6 +38,12 @@
 #include <gtk/gtk.h>
 #include <glib-object.h>
 
+/* Projections */
+enum {
+	GRITS_PROJ_MERCATOR,
+	GRITS_PROJ_EQUIRECTANGULAR,
+} GritsProjection;
+
 /* Rendering levels */
 /**
  * GRITS_LEVEL_BACKGROUND: 

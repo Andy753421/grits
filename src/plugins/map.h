@@ -36,6 +36,7 @@ struct _GritsPluginMap {
 	/* instance members */
 	GritsViewer *viewer;
 	GritsTile   *tiles;
+	GritsTms    *tms;
 	GritsWms    *wms;
 	GThreadPool *threads;
 	gulong       sigid;

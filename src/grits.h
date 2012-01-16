@@ -27,6 +27,7 @@
 /* Grits data */
 #include <data/grits-data.h>
 #include <data/grits-http.h>
+#include <data/grits-tms.h>
 #include <data/grits-wms.h>
 
 /* Grits objects */

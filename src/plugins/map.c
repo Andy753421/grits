@@ -86,6 +86,7 @@ static void _load_tile(GritsTile *tile, gpointer _map)
 	}
 
 	/* Download tile */
+	//gchar *path = grits_tms_fetch(map->tms, tile, GRITS_ONCE, NULL, NULL);
 	gchar *path = grits_wms_fetch(map->wms, tile, GRITS_ONCE, NULL, NULL);
 	if (!path) return; // Canceled/error
 
@@ -217,6 +218,9 @@ static void grits_plugin_map_init(GritsPluginMap *map)
 	g_debug("GritsPluginMap: init");
 	/* Set defaults */
 	map->threads = g_thread_pool_new(_update_tiles, map, 1, FALSE, NULL);
+	//map->tiles = grits_tile_new(NULL, 85.0511, -85.0511, EAST, WEST);
+	//map->wms   = grits_tms_new("http://tile.openstreetmap.org",
+	//	"osm/", "png");
 	map->tiles = grits_tile_new(NULL, NORTH, SOUTH, EAST, WEST);
 	map->wms   = grits_wms_new(
 		"http://vmap0.tiles.osgeo.org/wms/vmap0",
@@ -247,6 +251,7 @@ static void grits_plugin_map_finalize(GObject *gobject)
 	g_debug("GritsPluginMap: finalize");
 	GritsPluginMap *map = GRITS_PLUGIN_MAP(gobject);
 	/* Free data */
+	//grits_wms_free(map->tms);
 	grits_wms_free(map->wms);
 	grits_tile_free(map->tiles, _free_tile, map);
 	G_OBJECT_CLASS(grits_plugin_map_parent_class)->finalize(gobject);

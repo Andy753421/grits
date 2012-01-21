@@ -92,7 +92,7 @@ test: all
 	./grits-test
 
 gdb: all
-	gdb ./grits-test
+	gdb ./.libs/grits-test
 
 ddd: all
 	ddd ./grits-test

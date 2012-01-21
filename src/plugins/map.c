@@ -30,16 +30,19 @@
 
 #include "map.h"
 
-#define MAX_RESOLUTION 100
-#define TILE_WIDTH     1024
-#define TILE_HEIGHT    512
+#define MAX_RESOLUTION 1
+#define TILE_WIDTH     256
+#define TILE_HEIGHT    256
+//#define MAX_RESOLUTION 100
+//#define TILE_WIDTH     1024
+//#define TILE_HEIGHT    512
 
 static const guchar colormap[][2][4] = {
-	{{0x73, 0x91, 0xad}, {0x73, 0x91, 0xad, 0x00}}, // Oceans
-	{{0xf6, 0xee, 0xee}, {0xf6, 0xee, 0xee, 0x00}}, // Ground
-	{{0xff, 0xff, 0xff}, {0xff, 0xff, 0xff, 0xff}}, // Borders
-	{{0x73, 0x93, 0xad}, {0x73, 0x93, 0xad, 0x40}}, // Lakes
-	{{0xff, 0xe1, 0x80}, {0xff, 0xe1, 0x80, 0x60}}, // Cities
+	//{{0x73, 0x91, 0xad}, {0x73, 0x91, 0xad, 0x00}}, // Oceans
+	//{{0xf6, 0xee, 0xee}, {0xf6, 0xee, 0xee, 0x00}}, // Ground
+	//{{0xff, 0xff, 0xff}, {0xff, 0xff, 0xff, 0xff}}, // Borders
+	//{{0x73, 0x93, 0xad}, {0x73, 0x93, 0xad, 0x40}}, // Lakes
+	//{{0xff, 0xe1, 0x80}, {0xff, 0xe1, 0x80, 0x60}}, // Cities
 };
 
 struct _LoadTileData {
@@ -86,8 +89,8 @@ static void _load_tile(GritsTile *tile, gpointer _map)
 	}
 
 	/* Download tile */
-	//gchar *path = grits_tms_fetch(map->tms, tile, GRITS_ONCE, NULL, NULL);
-	gchar *path = grits_wms_fetch(map->wms, tile, GRITS_ONCE, NULL, NULL);
+	gchar *path = grits_tms_fetch(map->tms, tile, GRITS_ONCE, NULL, NULL);
+	//gchar *path = grits_wms_fetch(map->wms, tile, GRITS_ONCE, NULL, NULL);
 	if (!path) return; // Canceled/error
 
 	/* Load pixbuf */
@@ -140,9 +143,10 @@ static gboolean _free_tile_cb(gpointer data)
 }
 static void _free_tile(GritsTile *tile, gpointer _map)
 {
-	g_debug("GritsPluginMap: _free_tile: %p", tile->data);
-	if (tile->data)
+	if (tile->data) {
+		g_debug("GritsPluginMap: _free_tile: %p", tile->data);
 		g_idle_add_full(G_PRIORITY_LOW, _free_tile_cb, tile->data, NULL);
+	}
 }
 
 static void _update_tiles(gpointer _, gpointer _map)
@@ -193,7 +197,7 @@ GritsPluginMap *grits_plugin_map_new(GritsViewer *viewer)
 			G_CALLBACK(_on_location_changed), map);
 
 	/* Add renderers */
-	grits_viewer_add(viewer, GRITS_OBJECT(map->tiles), GRITS_LEVEL_OVERLAY-1, 0);
+	grits_viewer_add(viewer, GRITS_OBJECT(map->tiles), GRITS_LEVEL_WORLD, FALSE);
 
 	return map;
 }
@@ -218,14 +222,15 @@ static void grits_plugin_map_init(GritsPluginMap *map)
 	g_debug("GritsPluginMap: init");
 	/* Set defaults */
 	map->threads = g_thread_pool_new(_update_tiles, map, 1, FALSE, NULL);
-	//map->tiles = grits_tile_new(NULL, 85.0511, -85.0511, EAST, WEST);
-	//map->wms   = grits_tms_new("http://tile.openstreetmap.org",
-	//	"osm/", "png");
-	map->tiles = grits_tile_new(NULL, NORTH, SOUTH, EAST, WEST);
-	map->wms   = grits_wms_new(
-		"http://vmap0.tiles.osgeo.org/wms/vmap0",
-		"basic,priroad,secroad,depthcontour,clabel,statelabel",
-		 "image/png", "osm/", "png", TILE_WIDTH, TILE_HEIGHT);
+	map->tiles = grits_tile_new(NULL, 85.0511, -85.0511, EAST, WEST);
+	map->tms   = grits_tms_new("http://tile.openstreetmap.org",
+		"osmtile/", "png");
+	map->tiles->proj = GRITS_PROJ_MERCATOR;
+	//map->tiles = grits_tile_new(NULL, NORTH, SOUTH, EAST, WEST);
+	//map->wms   = grits_wms_new(
+	//	"http://vmap0.tiles.osgeo.org/wms/vmap0",
+	//	"basic,priroad,secroad,depthcontour,clabel,statelabel",
+	//	 "image/png", "osm/", "png", TILE_WIDTH, TILE_HEIGHT);
 	g_object_ref(map->tiles);
 }
 static void grits_plugin_map_dispose(GObject *gobject)
@@ -237,7 +242,8 @@ static void grits_plugin_map_dispose(GObject *gobject)
 	if (map->viewer) {
 		g_signal_handler_disconnect(map->viewer, map->sigid);
 		grits_viewer_remove(map->viewer, GRITS_OBJECT(map->tiles));
-		soup_session_abort(map->wms->http->soup);
+		soup_session_abort(map->tms->http->soup);
+		//soup_session_abort(map->wms->http->soup);
 		g_thread_pool_free(map->threads, TRUE, TRUE);
 		while (gtk_events_pending())
 			gtk_main_iteration();
@@ -251,8 +257,8 @@ static void grits_plugin_map_finalize(GObject *gobject)
 	g_debug("GritsPluginMap: finalize");
 	GritsPluginMap *map = GRITS_PLUGIN_MAP(gobject);
 	/* Free data */
-	//grits_wms_free(map->tms);
-	grits_wms_free(map->wms);
+	grits_tms_free(map->tms);
+	//grits_wms_free(map->wms);
 	grits_tile_free(map->tiles, _free_tile, map);
 	G_OBJECT_CLASS(grits_plugin_map_parent_class)->finalize(gobject);
 

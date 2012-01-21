@@ -39,10 +39,10 @@
 #include <glib-object.h>
 
 /* Projections */
-enum {
+typedef enum {
+	GRITS_PROJ_LATLON,
 	GRITS_PROJ_MERCATOR,
-	GRITS_PROJ_EQUIRECTANGULAR,
-} GritsProjection;
+} GritsProj;
 
 /* Rendering levels */
 /**

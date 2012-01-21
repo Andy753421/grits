@@ -25,63 +25,31 @@
 
 static gchar *_make_uri(GritsTms *tms, GritsTile *tile)
 {
-
-#if 0
-	/* This doesn't make any sense.. */
-	gdouble lon_rad = deg2rad(tile->edge.n + tile->edge.s)/2;
-	gdouble lat_rad = deg2rad(tile->edge.e + tile->edge.w)/2;
-	g_message("%lf,%lf", lat_rad, lon_rad);
-
-	/* Reproject the coordinates to the Mercator projection: */
-	gdouble x = lon_rad;
-	gdouble y = log(tan(lat_rad) + 1.0/cos(lat_rad));
-
-	/* Transform range of x and y to 0 - 1 and shift origin to top left */
-	x = (1.0 + (x / G_PI)) / 2.0;
-	y = (1.0 - (y / G_PI)) / 2.0;
-
-	/* Calculate the number of tiles across the map, n, using 2^zoom */
-	gint zoom = 0;
-	for (GritsTile *tmp = tile->parent; tmp; tmp = tmp->parent)
-		zoom++;
-	gint n = pow(2, zoom);
-
-	/* Multiply x and y by n. Round results down to give tilex and tiley. */
-	gint xtile = x * n;
-	gint ytile = y * n;
-
-	g_message("xy=%f,%f  zoom=%d  n=%d  xy_tiles=%d,%d",
-			x, y, zoom, n, xtile, ytile);
-#endif
-
-#if 1
-	/* This is broken */
 	gint zoom = 0;
 	for (GritsTile *tmp = tile->parent; tmp; tmp = tmp->parent)
 		zoom++;
 	gint breath = pow(2,zoom);
 
-	gdouble lon_pos =  (tile->edge.e+tile->edge.w)/2 + 180;
-	gdouble lat_pos = -(tile->edge.n+tile->edge.s)/2 +  90 - 4.9489;
+	gdouble lat_top = asinh(tan(deg2rad(tile->edge.n)));
+	gdouble lat_bot = asinh(tan(deg2rad(tile->edge.s)));
 
-	gdouble lon_total = 360;
-	gdouble lat_total = 85.0511*2;
+	gdouble lat_mid = (lat_top + lat_bot)/2.0;
+	gdouble lon_mid = (tile->edge.e + tile->edge.w)/2.0;
 
-	gdouble lon_pct = lon_pos / lon_total;
-	gdouble lat_pct = lat_pos / lat_total;
+	gdouble lat_pos = 1.0 - (lat_mid + G_PI) / (2.0*G_PI);
+	gdouble lon_pos = (lon_mid + 180.0) / 360.0;
 
-	gint xtile = lon_pct * breath;
-	gint ytile = lat_pct * breath;
+	gint xtile = lon_pos * breath;
+	gint ytile = lat_pos * breath;
 
-	//g_message("bbok=%f,%f,%f,%f",
+	//g_message("tile=%f,%f,%f,%f t=%p p=%p",
 	//		tile->edge.n, tile->edge.s,
-	//		tile->edge.e, tile->edge.w);
-	//g_message("pos=%f,%f total=%f,%f pct=%f,%f tile=%d,%d",
-	//		lon_pos,   lat_pos,
-	//		lon_total, lat_total,
-	//		lon_pct,   lat_pct,
-	//		xtile,     ytile);
-#endif
+	//		tile->edge.e, tile->edge.w, tile, tile->parent);
+	//g_message("top=%lf->%lf bot=%lf->%lf pos=%lf,%lf tile=%d,%d,%d",
+	//		tile->edge.n, lat_top,
+	//		tile->edge.s, lat_bot,
+	//		lat_pos, lon_pos,
+	//		zoom, xtile, ytile);
 
 	// http://tile.openstreetmap.org/<zoom>/<xtile>/<ytile>.png
 	return g_strdup_printf("%s/%d/%d/%d.%s",

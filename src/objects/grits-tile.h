@@ -53,6 +53,9 @@ struct _GritsTile {
 
 	/* Last access time (for garbage collection) */
 	time_t atime;
+
+	/* Projection used by tile data */
+	GritsProj proj;
 };
 
 struct _GritsTileClass {

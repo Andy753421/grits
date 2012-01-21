@@ -33,6 +33,7 @@
  */
 
 #include <config.h>
+#include <math.h>
 #include "gtkgl.h"
 #include "grits-tile.h"
 
@@ -61,6 +62,8 @@ GritsTile *grits_tile_new(GritsTile *parent,
 	tile->atime  = time(NULL);
 	grits_bounds_set_bounds(&tile->coords, 0, 1, 1, 0);
 	grits_bounds_set_bounds(&tile->edge, n, s, e, w);
+	if (parent)
+		tile->proj = parent->proj;
 	return tile;
 }
 
@@ -133,6 +136,43 @@ static gboolean _grits_tile_precise(GritsPoint *eye, GritsBounds *bounds,
 	       tile_res < view_res;
 }
 
+static void _grits_tile_split_latlon(GritsTile *tile)
+{
+	const gdouble rows = G_N_ELEMENTS(tile->children);
+	const gdouble cols = G_N_ELEMENTS(tile->children[0]);
+	const gdouble lat_dist = tile->edge.n - tile->edge.s;
+	const gdouble lon_dist = tile->edge.e - tile->edge.w;
+	const gdouble lat_step = lat_dist / rows;
+	const gdouble lon_step = lon_dist / cols;
+
+	int row, col;
+	grits_tile_foreach_index(tile, row, col)
+		tile->children[row][col] = grits_tile_new(tile,
+			tile->edge.n - lat_step*(row+0),  // north
+			tile->edge.n - lat_step*(row+1),  // south
+			tile->edge.w + lon_step*(col+1),  // east
+			tile->edge.w + lon_step*(col+0)); // west
+}
+
+static void _grits_tile_split_mercator(GritsTile *tile)
+{
+	GritsTile *child = NULL;
+	GritsBounds tmp = tile->edge;
+
+	/* Project */
+	tile->edge.n = asinh(tan(deg2rad(tile->edge.n)));
+	tile->edge.s = asinh(tan(deg2rad(tile->edge.s)));
+
+	_grits_tile_split_latlon(tile);
+
+	/* Convert back to lat-lon */
+	tile->edge = tmp;
+	grits_tile_foreach(tile, child) {
+		child->edge.n = rad2deg(atan(sinh(child->edge.n)));
+		child->edge.s = rad2deg(atan(sinh(child->edge.s)));
+	}
+}
+
 /**
  * grits_tile_update:
  * @root:      the root tile to split
@@ -149,43 +189,37 @@ static gboolean _grits_tile_precise(GritsPoint *eye, GritsBounds *bounds,
  * the tile is recursively subdivided until a sufficient resolution is
  * achieved.
  */
-void grits_tile_update(GritsTile *root, GritsPoint *eye,
+void grits_tile_update(GritsTile *tile, GritsPoint *eye,
 		gdouble res, gint width, gint height,
 		GritsTileLoadFunc load_func, gpointer user_data)
 {
-	root->atime = time(NULL);
 	//g_debug("GritsTile: update - %p->atime = %u",
-	//		root, (guint)root->atime);
-	const gdouble rows = G_N_ELEMENTS(root->children);
-	const gdouble cols = G_N_ELEMENTS(root->children[0]);
-	const gdouble lat_dist = root->edge.n - root->edge.s;
-	const gdouble lon_dist = root->edge.e - root->edge.w;
-	const gdouble lat_step = lat_dist / rows;
-	const gdouble lon_step = lon_dist / cols;
-	int row, col;
-	grits_tile_foreach_index(root, row, col) {
-		GritsBounds edge;
-		edge.n = root->edge.n-(lat_step*(row+0));
-		edge.s = root->edge.n-(lat_step*(row+1));
-		edge.e = root->edge.w+(lon_step*(col+1));
-		edge.w = root->edge.w+(lon_step*(col+0));
+	//		tile, (guint)tile->atime);
 
-		GritsTile **child = &root->children[row][col];
-		if (!_grits_tile_precise(eye, &edge, res,
-				width/cols, height/rows)) {
-			if (!*child) {
-				*child = grits_tile_new(root, edge.n, edge.s,
-						edge.e, edge.w);
-				load_func(*child, user_data);
-			}
-			grits_tile_update(*child, eye,
-					res, width, height,
-					load_func, user_data);
-			GRITS_OBJECT(*child)->hidden = FALSE;
-		} else if (*child) {
-			GRITS_OBJECT(*child)->hidden = TRUE;
+	if (tile == NULL)
+		return;
+
+	GRITS_OBJECT(tile)->hidden = TRUE;
+	if (_grits_tile_precise(eye, &tile->edge, res, width, height))
+		return;
+	tile->atime = time(NULL);
+	GRITS_OBJECT(tile)->hidden = FALSE;
+
+	if (!tile->data)
+		load_func(tile, user_data);
+
+	if (!tile->children[0][0]) {
+		switch (tile->proj) {
+		case GRITS_PROJ_LATLON:   _grits_tile_split_latlon(tile);   break;
+		case GRITS_PROJ_MERCATOR: _grits_tile_split_mercator(tile); break;
 		}
 	}
+
+	GritsTile *child;
+	grits_tile_foreach(tile, child)
+		grits_tile_update(child, eye, res, width, height,
+				load_func, user_data);
+
 }
 
 /**

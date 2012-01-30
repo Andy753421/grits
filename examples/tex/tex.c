@@ -21,29 +21,7 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 
-#define crazy_draw(tex) \
-	for (int _i = 0; ({ \
-		if (_i == 0) { \
-			/* Clear alpha buffer */ \
-			glBindTexture(GL_TEXTURE_2D, tex); \
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); \
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); \
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER); \
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER); \
-			glBlendFuncSeparate(GL_ZERO, GL_ONE, GL_ONE, GL_ZERO); \
-		} else if (_i == 1) { \
-			/* Draw pixels */ \
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); \
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); \
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP); \
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP); \
-			glBlendFuncSeparate(GL_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ZERO, GL_ZERO); \
-		} else { \
-			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); \
-		} \
-	}), _i < 2; _i++)
-
-guint tex, texl, texr;
+guint tex, texl, texr, mask;
 
 gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer _)
 {
@@ -80,28 +58,40 @@ gboolean on_expose(GtkWidget *drawing, GdkEventExpose *event, gpointer _)
 	/* Setup for textures */
 	glEnable(GL_TEXTURE_2D);
 	glEnable(GL_BLEND);
-	glColor4f(1.0, 1.0, 1.0, 1.0);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_COLOR_MATERIAL);
 
+	/* Setup mask */
+	glActiveTexture(GL_TEXTURE1);
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, mask);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+	glActiveTexture(GL_TEXTURE0);
+	glEnable(GL_TEXTURE_2D);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
 	/* Left */
-	crazy_draw(texl) {
-		glBegin(GL_QUADS);
-		glTexCoord2f( 0.0, y);     glVertex3f(-0.75,  0.0, 0.0);
-		glTexCoord2f( 0.0, 1.0);   glVertex3f(-0.75,  0.5, 0.0);
-		glTexCoord2f( 2.0, 1.0);   glVertex3f( 0.75,  0.5, 0.0);
-		glTexCoord2f( 2.0, y);     glVertex3f( 0.75,  0.0, 0.0);
-		glEnd();
-	}
+	glBindTexture(GL_TEXTURE_2D, texl);
+	glBegin(GL_QUADS);
+	glMultiTexCoord2f(GL_TEXTURE0,  0.0, y);     glMultiTexCoord2f(GL_TEXTURE1,  0.0, y);     glVertex3f(-0.75,  0.0, 0.0);
+	glMultiTexCoord2f(GL_TEXTURE0,  0.0, 1.0);   glMultiTexCoord2f(GL_TEXTURE1,  0.0, 1.0);   glVertex3f(-0.75,  0.5, 0.0);
+	glMultiTexCoord2f(GL_TEXTURE0,  2.0, 1.0);   glMultiTexCoord2f(GL_TEXTURE1,  2.0, 1.0);   glVertex3f( 0.75,  0.5, 0.0);
+	glMultiTexCoord2f(GL_TEXTURE0,  2.0, y);     glMultiTexCoord2f(GL_TEXTURE1,  2.0, y);     glVertex3f( 0.75,  0.0, 0.0);
+	glEnd();
 
 	/* Right */
-	crazy_draw(texr) {
-		glBegin(GL_QUADS);
-		glTexCoord2f(-1.0, y);     glVertex3f(-0.75, 0.0, 0.0);
-		glTexCoord2f(-1.0, 1.0);   glVertex3f(-0.75, 0.5, 0.0);
-		glTexCoord2f( 1.0, 1.0);   glVertex3f( 0.75, 0.5, 0.0);
-		glTexCoord2f( 1.0, y);     glVertex3f( 0.75, 0.0, 0.0);
-		glEnd();
-	}
+	glBindTexture(GL_TEXTURE_2D, texr);
+	glBegin(GL_QUADS);
+	glMultiTexCoord2f(GL_TEXTURE0, -1.0, y);     glMultiTexCoord2f(GL_TEXTURE1, -1.0, y);     glVertex3f(-0.75, 0.0, 0.0);
+	glMultiTexCoord2f(GL_TEXTURE0, -1.0, 1.0);   glMultiTexCoord2f(GL_TEXTURE1, -1.0, 1.0);   glVertex3f(-0.75, 0.5, 0.0);
+	glMultiTexCoord2f(GL_TEXTURE0,  1.0, 1.0);   glMultiTexCoord2f(GL_TEXTURE1,  1.0, 1.0);   glVertex3f( 0.75, 0.5, 0.0);
+	glMultiTexCoord2f(GL_TEXTURE0,  1.0, y);     glMultiTexCoord2f(GL_TEXTURE1,  1.0, y);     glVertex3f( 0.75, 0.0, 0.0);
+	glEnd();
+
+	glActiveTexture(GL_TEXTURE1);
+	glDisable(GL_TEXTURE_2D);
+	glActiveTexture(GL_TEXTURE0);
 
 	/* Bottom */
 	glBindTexture(GL_TEXTURE_2D, tex);
@@ -128,6 +118,26 @@ gboolean on_configure(GtkWidget *drawing, GdkEventConfigure *event, gpointer _)
 	return FALSE;
 }
 
+guint load_mask(void)
+{
+	guint  tex  = 0;
+	guint8 byte = 0xff;
+
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 1, 1, 0,
+			GL_ALPHA, GL_UNSIGNED_BYTE, &byte);
+
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+	return tex;
+}
+
 guint load_tex(gchar *filename)
 {
 	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(filename, NULL);
@@ -136,15 +146,18 @@ guint load_tex(gchar *filename)
 	int        height = gdk_pixbuf_get_height(pixbuf);
 	int        alpha  = gdk_pixbuf_get_has_alpha(pixbuf);
 	guint      tex;
+
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
-	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0,
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
 			(alpha ? GL_RGBA : GL_RGB), GL_UNSIGNED_BYTE, pixels);
+
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
 	g_object_unref(pixbuf);
 	return tex;
 }
@@ -172,6 +185,7 @@ int main(int argc, char **argv)
 	gdk_gl_drawable_gl_begin(gldrawable, glcontext);
 
 	/* Load texture */
+	mask = load_mask();
 	texl = load_tex("texls.png");
 	texr = load_tex("texrs.png");
 	tex  = load_tex("tex.png");

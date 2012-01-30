@@ -21,6 +21,28 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 
+#define crazy_draw(tex) \
+	for (int _i = 0; ({ \
+		if (_i == 0) { \
+			/* Clear alpha buffer */ \
+			glBindTexture(GL_TEXTURE_2D, tex); \
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); \
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); \
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER); \
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER); \
+			glBlendFuncSeparate(GL_ZERO, GL_ONE, GL_ONE, GL_ZERO); \
+		} else if (_i == 1) { \
+			/* Draw pixels */ \
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); \
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); \
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP); \
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP); \
+			glBlendFuncSeparate(GL_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ZERO, GL_ZERO); \
+		} else { \
+			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); \
+		} \
+	}), _i < 2; _i++)
+
 guint tex, texl, texr;
 
 gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer _)
@@ -32,7 +54,7 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer _)
 
 gboolean on_expose(GtkWidget *drawing, GdkEventExpose *event, gpointer _)
 {
-	gdouble y = 0.875;
+	gdouble y = 0;
 
 	/* Setup view */
 	glMatrixMode(GL_PROJECTION);
@@ -55,44 +77,33 @@ gboolean on_expose(GtkWidget *drawing, GdkEventExpose *event, gpointer _)
 	glVertex3f( 0.25, -0.75, 0.0);
 	glEnd();
 
-	/* Clear background for GL_ONE */
-	glEnable(GL_COLOR_MATERIAL);
-	glDisable(GL_TEXTURE_2D);
-	glColor4f(0.0, 0.0, 0.0, 0.0);
-	glBegin(GL_QUADS);
-	glVertex3f(-0.75,  0.0, 0.0);
-	glVertex3f(-0.75,  0.5, 0.0);
-	glVertex3f( 0.75,  0.5, 0.0);
-	glVertex3f( 0.75,  0.0, 0.0);
-	glEnd();
-
 	/* Setup for textures */
 	glEnable(GL_TEXTURE_2D);
 	glEnable(GL_BLEND);
 	glColor4f(1.0, 1.0, 1.0, 1.0);
 	glDisable(GL_COLOR_MATERIAL);
-	glBlendFunc(GL_ONE, GL_ONE);
 
 	/* Left */
-	glBindTexture(GL_TEXTURE_2D, texl);
-	glBegin(GL_QUADS);
-	glTexCoord2f( 0.0, y);     glVertex3f(-0.75,  0.0, 0.0);
-	glTexCoord2f( 0.0, 1.0);   glVertex3f(-0.75,  0.5, 0.0);
-	glTexCoord2f( 2.0, 1.0);   glVertex3f( 0.75,  0.5, 0.0);
-	glTexCoord2f( 2.0, y);     glVertex3f( 0.75,  0.0, 0.0);
-	glEnd();
+	crazy_draw(texl) {
+		glBegin(GL_QUADS);
+		glTexCoord2f( 0.0, y);     glVertex3f(-0.75,  0.0, 0.0);
+		glTexCoord2f( 0.0, 1.0);   glVertex3f(-0.75,  0.5, 0.0);
+		glTexCoord2f( 2.0, 1.0);   glVertex3f( 0.75,  0.5, 0.0);
+		glTexCoord2f( 2.0, y);     glVertex3f( 0.75,  0.0, 0.0);
+		glEnd();
+	}
 
 	/* Right */
-	glBindTexture(GL_TEXTURE_2D, texr);
-	glBegin(GL_QUADS);
-	glTexCoord2f(-1.0, y);     glVertex3f(-0.75, 0.0, 0.0);
-	glTexCoord2f(-1.0, 1.0);   glVertex3f(-0.75, 0.5, 0.0);
-	glTexCoord2f( 1.0, 1.0);   glVertex3f( 0.75, 0.5, 0.0);
-	glTexCoord2f( 1.0, y);     glVertex3f( 0.75, 0.0, 0.0);
-	glEnd();
+	crazy_draw(texr) {
+		glBegin(GL_QUADS);
+		glTexCoord2f(-1.0, y);     glVertex3f(-0.75, 0.0, 0.0);
+		glTexCoord2f(-1.0, 1.0);   glVertex3f(-0.75, 0.5, 0.0);
+		glTexCoord2f( 1.0, 1.0);   glVertex3f( 0.75, 0.5, 0.0);
+		glTexCoord2f( 1.0, y);     glVertex3f( 0.75, 0.0, 0.0);
+		glEnd();
+	}
 
 	/* Bottom */
-	glBlendFunc(GL_ONE, GL_ZERO);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glBegin(GL_QUADS);
 	glTexCoord2f( 0.0, 0.0);   glVertex3f(-0.75, -0.5, 0.0);
@@ -132,8 +143,8 @@ guint load_tex(gchar *filename)
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
 	g_object_unref(pixbuf);
 	return tex;
 }

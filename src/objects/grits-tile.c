@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Andy Spencer <andy753421@gmail.com>
+ * Copyright (C) 2009-2010, 2012 Andy Spencer <andy753421@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,6 +36,8 @@
 #include <math.h>
 #include "gtkgl.h"
 #include "grits-tile.h"
+
+guint  grits_tile_mask = 0;
 
 gchar *grits_tile_path_table[2][2] = {
 	{"00.", "01."},
@@ -120,17 +122,17 @@ static gboolean _grits_tile_precise(GritsPoint *eye, GritsBounds *bounds,
 	gdouble lon_dist  = bounds->e - bounds->w;
 	gdouble tile_res  = ll2m(lon_dist, lat_point)/width;
 
-	/* This isn't really right, but it helps with memory since we don't (yet?) test if the tile
-	 * would be drawn */
+	/* This isn't really right, but it helps with memory since we don't
+	 * (yet?) test if the tile would be drawn */
 	gdouble scale = eye->elev / min_dist;
 	view_res /= scale;
 	//view_res /= 1.4; /* make it a little nicer, not sure why this is needed */
 	//g_message("tile=(%7.2f %7.2f %7.2f %7.2f) "
 	//          "eye=(%9.1f %9.1f %9.1f) "
 	//          "elev=%9.1f / dist=%9.1f = %f",
-	//		tile->edge.n, tile->edge.s, tile->edge.e, tile->edge.w,
-	//		lat, lon, elev,
-	//		elev, min_dist, scale);
+	//		bounds->n, bounds->s, bounds->e, bounds->w,
+	//		eye->lat, eye->lon, eye->elev,
+	//		eye->elev, min_dist, scale);
 
 	return tile_res < max_res ||
 	       tile_res < view_res;
@@ -195,19 +197,25 @@ void grits_tile_update(GritsTile *tile, GritsPoint *eye,
 {
 	//g_debug("GritsTile: update - %p->atime = %u",
 	//		tile, (guint)tile->atime);
+	GritsTile *child;
 
 	if (tile == NULL)
 		return;
 
-	GRITS_OBJECT(tile)->hidden = TRUE;
-	if (_grits_tile_precise(eye, &tile->edge, res, width, height))
-		return;
-	tile->atime = time(NULL);
-	GRITS_OBJECT(tile)->hidden = FALSE;
-
 	if (!tile->data)
 		load_func(tile, user_data);
 
+	tile->atime = time(NULL);
+
+	/* Is this tile high enough resolution? */
+	if (_grits_tile_precise(eye, &tile->edge, res, width, height)) {
+		grits_tile_foreach(tile, child)
+			if (child)
+				GRITS_OBJECT(child)->hidden = TRUE;
+		return;
+	}
+
+	/* Need more resolution, split tile and update recursively */
 	if (!tile->children[0][0]) {
 		switch (tile->proj) {
 		case GRITS_PROJ_LATLON:   _grits_tile_split_latlon(tile);   break;
@@ -215,10 +223,11 @@ void grits_tile_update(GritsTile *tile, GritsPoint *eye,
 		}
 	}
 
-	GritsTile *child;
-	grits_tile_foreach(tile, child)
+	grits_tile_foreach(tile, child) {
+		GRITS_OBJECT(child)->hidden = FALSE;
 		grits_tile_update(child, eye, res, width, height,
 				load_func, user_data);
+	}
 
 }
 
@@ -319,6 +328,25 @@ void grits_tile_free(GritsTile *root, GritsTileFreeFunc free_func, gpointer user
 	g_object_unref(root);
 }
 
+/* Load texture mask so we can draw a texture to just a part of a triangle */
+static guint _grits_tile_load_mask(void)
+{
+	guint  tex;
+	guint8 byte = 0xff;
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 1, 1, 0,
+			GL_ALPHA, GL_UNSIGNED_BYTE, &byte);
+
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	return tex;
+}
+
 /* Draw a single tile */
 static void grits_tile_draw_one(GritsTile *tile, GritsOpenGL *opengl, GList *triangles)
 {
@@ -327,6 +355,9 @@ static void grits_tile_draw_one(GritsTile *tile, GritsOpenGL *opengl, GList *tri
 	if (!triangles)
 		g_warning("GritsOpenGL: _draw_tiles - No triangles to draw: edges=%f,%f,%f,%f",
 			tile->edge.n, tile->edge.s, tile->edge.e, tile->edge.w);
+	if (!grits_tile_mask)
+		grits_tile_mask = _grits_tile_load_mask();
+
 	//g_message("drawing %4d triangles for tile edges=%7.2f,%7.2f,%7.2f,%7.2f",
 	//		g_list_length(triangles), tile->edge.n, tile->edge.s, tile->edge.e, tile->edge.w);
 	tile->atime = time(NULL);
@@ -384,65 +415,69 @@ static void grits_tile_draw_one(GritsTile *tile, GritsOpenGL *opengl, GList *tri
 			xy[i][1] = tile->coords.n + xy[i][1]*yscale;
 		}
 
-		glEnable(GL_TEXTURE_2D);
+		/* Polygon offset */
 		glEnable(GL_POLYGON_OFFSET_FILL);
-		glBindTexture(GL_TEXTURE_2D, *(guint*)tile->data);
 		glPolygonOffset(0, -tile->zindex);
+
+		/* Setup texture */
+		glActiveTexture(GL_TEXTURE0);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, *(guint*)tile->data);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+		/* Enable texture mask */
+		if (tile->proj == GRITS_PROJ_MERCATOR) {
+			glActiveTexture(GL_TEXTURE1);
+			glEnable(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, grits_tile_mask);
+			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+		}
+
+		/* Draw triangle */
 		glBegin(GL_TRIANGLES);
-		glNormal3dv(tri->p.r->norm); glTexCoord2dv(xy[0]); glVertex3dv((double*)tri->p.r);
-		glNormal3dv(tri->p.m->norm); glTexCoord2dv(xy[1]); glVertex3dv((double*)tri->p.m);
-		glNormal3dv(tri->p.l->norm); glTexCoord2dv(xy[2]); glVertex3dv((double*)tri->p.l);
+		glNormal3dv(tri->p.r->norm); glMultiTexCoord2dv(GL_TEXTURE0, xy[0]); glMultiTexCoord2dv(GL_TEXTURE1, xy[0]); glVertex3dv((double*)tri->p.r);
+		glNormal3dv(tri->p.m->norm); glMultiTexCoord2dv(GL_TEXTURE0, xy[1]); glMultiTexCoord2dv(GL_TEXTURE1, xy[1]); glVertex3dv((double*)tri->p.m);
+		glNormal3dv(tri->p.l->norm); glMultiTexCoord2dv(GL_TEXTURE0, xy[2]); glMultiTexCoord2dv(GL_TEXTURE1, xy[2]); glVertex3dv((double*)tri->p.l);
 		glEnd();
+
+		/* Disable texture mask */
+		glDisable(GL_TEXTURE_2D);
+		glActiveTexture(GL_TEXTURE0);
 	}
 }
 
 /* Draw the tile */
 static void grits_tile_draw_rec(GritsTile *tile, GritsOpenGL *opengl)
 {
+	if (!tile || !tile->data || GRITS_OBJECT(tile)->hidden)
+		return;
+
 	/* Only draw children if possible */
-	gboolean has_children = FALSE;
+	gboolean has_all_children = TRUE;
 	GritsTile *child;
 	grits_tile_foreach(tile, child)
-		if (child && child->data)
-			has_children = TRUE;
+		if (!child || !child->data || GRITS_OBJECT(child)->hidden)
+			has_all_children = FALSE;
 
-	GList *triangles = NULL;
-	if (has_children && !GRITS_OBJECT(tile)->hidden) {
-		/* TODO: simplify this */
-		const gdouble rows = G_N_ELEMENTS(tile->children);
-		const gdouble cols = G_N_ELEMENTS(tile->children[0]);
-		const gdouble lat_dist = tile->edge.n - tile->edge.s;
-		const gdouble lon_dist = tile->edge.e - tile->edge.w;
-		const gdouble lat_step = lat_dist / rows;
-		const gdouble lon_step = lon_dist / cols;
-		int row, col;
-		grits_tile_foreach_index(tile, row, col) {
-			GritsTile *child = tile->children[row][col];
-			if (child && child->data) {
-				grits_tile_draw_rec(child, opengl);
-			} else {
-				const gdouble n = tile->edge.n-(lat_step*(row+0));
-				const gdouble s = tile->edge.n-(lat_step*(row+1));
-				const gdouble e = tile->edge.w+(lon_step*(col+1));
-				const gdouble w = tile->edge.w+(lon_step*(col+0));
-				GList *these = roam_sphere_get_intersect(opengl->sphere,
-						FALSE, n, s, e, w);
-				triangles = g_list_concat(triangles, these);
-			}
-		}
-	} else {
-		triangles = roam_sphere_get_intersect(opengl->sphere, FALSE,
+	/* Draw parent tile underneath */
+	if (!has_all_children) {
+		GList *triangles = roam_sphere_get_intersect(opengl->sphere, FALSE,
 				tile->edge.n, tile->edge.s, tile->edge.e, tile->edge.w);
-	}
-	if (triangles)
 		grits_tile_draw_one(tile, opengl, triangles);
-	g_list_free(triangles);
+		g_list_free(triangles);
+	}
+
+	/* Draw child tiles */
+	grits_tile_foreach(tile, child)
+		grits_tile_draw_rec(child, opengl);
 }
 
 static void grits_tile_draw(GritsObject *tile, GritsOpenGL *opengl)
 {
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
+	glEnable(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER, 0.5);
 	grits_tile_draw_rec(GRITS_TILE(tile), opengl);
 }
 

@@ -32,16 +32,19 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer _)
 
 gboolean on_expose(GtkWidget *drawing, GdkEventExpose *event, gpointer _)
 {
-	glClearColor(0.5, 0.5, 1.0, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	gdouble y = 0.875;
 
+	/* Setup view */
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	glOrtho(-1,1, -1,1, 10,-10);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	glTranslatef(0, 0, -5);
+	glClearColor(0.5, 0.5, 1.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	/* Draw white background rectangle */
 	glEnable(GL_COLOR_MATERIAL);
 	glDisable(GL_TEXTURE_2D);
 	glColor3f(1.0, 1.0, 1.0);
@@ -52,43 +55,51 @@ gboolean on_expose(GtkWidget *drawing, GdkEventExpose *event, gpointer _)
 	glVertex3f( 0.25, -0.75, 0.0);
 	glEnd();
 
-	/* Textures */
-	glDisable(GL_COLOR_MATERIAL);
+	/* Clear background for GL_ONE */
+	glEnable(GL_COLOR_MATERIAL);
+	glDisable(GL_TEXTURE_2D);
+	glColor4f(0.0, 0.0, 0.0, 0.0);
+	glBegin(GL_QUADS);
+	glVertex3f(-0.75,  0.0, 0.0);
+	glVertex3f(-0.75,  0.5, 0.0);
+	glVertex3f( 0.75,  0.5, 0.0);
+	glVertex3f( 0.75,  0.0, 0.0);
+	glEnd();
+
+	/* Setup for textures */
 	glEnable(GL_TEXTURE_2D);
 	glEnable(GL_BLEND);
-
-	gdouble y = 0.875;
+	glColor4f(1.0, 1.0, 1.0, 1.0);
+	glDisable(GL_COLOR_MATERIAL);
+	glBlendFunc(GL_ONE, GL_ONE);
 
 	/* Left */
-	glBlendFunc(GL_ONE, GL_ZERO);
 	glBindTexture(GL_TEXTURE_2D, texl);
 	glBegin(GL_QUADS);
-	glTexCoord2f(0.0, y); glVertex3f(-0.75,  0.0, 0.0);
-	glTexCoord2f(0.0, 1.0); glVertex3f(-0.75,  0.5, 0.0);
-	glTexCoord2f(2.0, 1.0); glVertex3f( 0.75,  0.5, 0.0);
-	glTexCoord2f(2.0, y); glVertex3f( 0.75,  0.0, 0.0);
+	glTexCoord2f( 0.0, y);     glVertex3f(-0.75,  0.0, 0.0);
+	glTexCoord2f( 0.0, 1.0);   glVertex3f(-0.75,  0.5, 0.0);
+	glTexCoord2f( 2.0, 1.0);   glVertex3f( 0.75,  0.5, 0.0);
+	glTexCoord2f( 2.0, y);     glVertex3f( 0.75,  0.0, 0.0);
 	glEnd();
 
 	/* Right */
-	glBlendFunc(GL_ONE, GL_ONE);
 	glBindTexture(GL_TEXTURE_2D, texr);
 	glBegin(GL_QUADS);
-	glTexCoord2f(-1.0, y); glVertex3f(-0.75, 0.0, 0.0);
-	glTexCoord2f(-1.0, 1.0); glVertex3f(-0.75, 0.5, 0.0);
-	glTexCoord2f( 1.0, 1.0); glVertex3f( 0.75, 0.5, 0.0);
-	glTexCoord2f( 1.0, y); glVertex3f( 0.75, 0.0, 0.0);
+	glTexCoord2f(-1.0, y);     glVertex3f(-0.75, 0.0, 0.0);
+	glTexCoord2f(-1.0, 1.0);   glVertex3f(-0.75, 0.5, 0.0);
+	glTexCoord2f( 1.0, 1.0);   glVertex3f( 0.75, 0.5, 0.0);
+	glTexCoord2f( 1.0, y);     glVertex3f( 0.75, 0.0, 0.0);
 	glEnd();
 
 	/* Bottom */
 	glBlendFunc(GL_ONE, GL_ZERO);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glBegin(GL_QUADS);
-	glTexCoord2f(0.0, 0.0); glVertex3f(-0.75, -0.5, 0.0);
-	glTexCoord2f(0.0, 1.0-y); glVertex3f(-0.75, -0.0, 0.0);
-	glTexCoord2f(1.0, 1.0-y); glVertex3f( 0.75, -0.0, 0.0);
-	glTexCoord2f(1.0, 0.0); glVertex3f( 0.75, -0.5, 0.0);
+	glTexCoord2f( 0.0, 0.0);   glVertex3f(-0.75, -0.5, 0.0);
+	glTexCoord2f( 0.0, 1.0-y); glVertex3f(-0.75, -0.0, 0.0);
+	glTexCoord2f( 1.0, 1.0-y); glVertex3f( 0.75, -0.0, 0.0);
+	glTexCoord2f( 1.0, 0.0);   glVertex3f( 0.75, -0.5, 0.0);
 	glEnd();
-
 
 	/* Flush */
 	GdkGLDrawable *gldrawable = gdk_gl_drawable_get_current();

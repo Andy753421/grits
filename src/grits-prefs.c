@@ -33,6 +33,7 @@
 #include <config.h>
 
 #include <glib.h>
+#include <time.h>
 #include "grits-marshal.h"
 #include "grits-prefs.h"
 
@@ -45,6 +46,7 @@ static guint signals[NUM_SIGNALS];
 /* Helper functions */
 static void grits_prefs_save(GritsPrefs *prefs)
 {
+	g_debug("GritsPrefs: save");
 	gsize length;
 	gchar *dir = g_path_get_dirname(prefs->key_path);
 	if (!g_file_test(dir, G_FILE_TEST_EXISTS))
@@ -53,6 +55,21 @@ static void grits_prefs_save(GritsPrefs *prefs)
 	g_file_set_contents(prefs->key_path, data, length, NULL);
 	g_free(dir);
 	g_free(data);
+}
+static gboolean grits_prefs_try_save(GritsPrefs *prefs)
+{
+	const  time_t interval = 1;
+	static time_t lastsave = 0;
+	static guint  source   = 0;
+	if (time(NULL) - lastsave > interval) {
+		grits_prefs_save(prefs);
+		lastsave = time(NULL);
+		source   = 0;
+	} else if (source == 0) {
+		source = g_timeout_add_seconds(interval,
+			(GSourceFunc)grits_prefs_try_save, prefs);
+	}
+	return FALSE;
 }
 
 /***********
@@ -131,7 +148,7 @@ void grits_prefs_set_##name##_v(GritsPrefs *prefs,                              
 	gchar *all = g_strconcat(group, "/", key, NULL);                             \
 	g_signal_emit(prefs, signals[SIG_PREF_CHANGED], 0,                           \
 			all, g_type, &value);                                        \
-	grits_prefs_save(prefs);                                                     \
+	grits_prefs_try_save(prefs);                                                 \
 	g_free(all);                                                                 \
 }                                                                                    \
 void grits_prefs_set_##name(GritsPrefs *prefs, const gchar *key, const c_type value) \

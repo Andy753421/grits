@@ -430,7 +430,13 @@ static void grits_tile_draw_one(GritsTile *tile, GritsOpenGL *opengl, GList *tri
 			glActiveTexture(GL_TEXTURE1);
 			glEnable(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, grits_tile_mask);
-			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+			/* Hack to show maps tiles with better color */
+			float material_emission[] = {0.5, 0.5, 0.5, 1.0};
+			glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, material_emission);
+
+			glEnable(GL_BLEND);
 		}
 
 		/* Draw triangle */
@@ -447,29 +453,38 @@ static void grits_tile_draw_one(GritsTile *tile, GritsOpenGL *opengl, GList *tri
 }
 
 /* Draw the tile */
-static void grits_tile_draw_rec(GritsTile *tile, GritsOpenGL *opengl)
+static gboolean grits_tile_draw_rec(GritsTile *tile, GritsOpenGL *opengl)
 {
 	if (!tile || !tile->data || GRITS_OBJECT(tile)->hidden)
-		return;
+		return FALSE;
 
-	/* Only draw children if possible */
-	gboolean has_all_children = TRUE;
-	GritsTile *child;
-	grits_tile_foreach(tile, child)
-		if (!child || !child->data || GRITS_OBJECT(child)->hidden)
-			has_all_children = FALSE;
+	GritsTile *child = NULL;
+	gboolean   done  = FALSE;
+	while (!done) {
+		/* Only draw children if possible */
+		gboolean draw_parent = FALSE;
+		grits_tile_foreach(tile, child)
+			if (!child || !child->data || GRITS_OBJECT(child)->hidden)
+				draw_parent = TRUE;
 
-	/* Draw parent tile underneath */
-	if (!has_all_children) {
-		GList *triangles = roam_sphere_get_intersect(opengl->sphere, FALSE,
-				tile->edge.n, tile->edge.s, tile->edge.e, tile->edge.w);
-		grits_tile_draw_one(tile, opengl, triangles);
-		g_list_free(triangles);
+		/* Draw parent tile underneath */
+		if (draw_parent) {
+			GList *triangles = roam_sphere_get_intersect(opengl->sphere, FALSE,
+					tile->edge.n, tile->edge.s, tile->edge.e, tile->edge.w);
+			grits_tile_draw_one(tile, opengl, triangles);
+			g_list_free(triangles);
+		}
+
+		/* Draw child tiles */
+		gboolean drew_all_children = TRUE;
+		grits_tile_foreach(tile, child)
+			if (!grits_tile_draw_rec(child, opengl))
+				drew_all_children = FALSE;
+
+		/* Check if tiles were hidden by a thread while drawing */
+		done = draw_parent || drew_all_children;
 	}
-
-	/* Draw child tiles */
-	grits_tile_foreach(tile, child)
-		grits_tile_draw_rec(child, opengl);
+	return TRUE;
 }
 
 static void grits_tile_draw(GritsObject *tile, GritsOpenGL *opengl)
@@ -477,7 +492,7 @@ static void grits_tile_draw(GritsObject *tile, GritsOpenGL *opengl)
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
 	glEnable(GL_ALPHA_TEST);
-	glAlphaFunc(GL_GREATER, 0.5);
+	glAlphaFunc(GL_GREATER, 0.1);
 	grits_tile_draw_rec(GRITS_TILE(tile), opengl);
 }
 

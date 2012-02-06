@@ -445,8 +445,8 @@ void grits_viewer_center_position(GritsViewer *viewer,
  * grits_viewer_project:
  * @viewer: the viewer
  * @lat:  the latitude
- * @lon:  the latitude
- * @elev: the latitude
+ * @lon:  the longitude
+ * @elev: the elevation
  * @px:   the project x coordinate
  * @py:   the project y coordinate
  * @pz:   the project z coordinate
@@ -463,6 +463,31 @@ void grits_viewer_project(GritsViewer *viewer,
 	if (!klass->project)
 		g_warning("GritsViewer: project - Unimplemented");
 	klass->project(viewer, lat, lon, elev, px, py, pz);
+}
+
+/**
+ * grits_viewer_unproject:
+ * @viewer: the viewer
+ * @x:    x coordinate in screen space
+ * @y:    y coordinate in screen space
+ * @z:    z coordinate in screen space, or -1 to use the value
+ *        from the depth buffer at x and y as the z value
+ * @lat:  the latitude
+ * @lon:  the longitude
+ * @elev: the elevation
+ *
+ * Project a x, y point in screen space to a latitude, longitude, and elevation
+ * point. Useful for finding the position of the cursor or another on-screen
+ * object in world coordinates.
+ */
+void grits_viewer_unproject(GritsViewer *viewer,
+		gdouble px, gdouble py, gdouble pz,
+		gdouble *lat, gdouble *lon, gdouble *elev)
+{
+	GritsViewerClass *klass = GRITS_VIEWER_GET_CLASS(viewer);
+	if (!klass->unproject)
+		g_warning("GritsViewer: unproject - Unimplemented");
+	klass->unproject(viewer, px, py, pz, lat, lon, elev);
 }
 
 /**

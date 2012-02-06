@@ -316,6 +316,11 @@ static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpo
 	g_ptr_array_free(objects, TRUE);
 	g_mutex_unlock(opengl->objects_lock);
 
+	/* Test unproject */
+	gdouble lat, lon, elev;
+	grits_viewer_unproject(GRITS_VIEWER(opengl),
+			gl_x, gl_y, -1, &lat, &lon, &elev);
+
 	/* Cleanup */
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
@@ -457,6 +462,30 @@ static void grits_opengl_project(GritsViewer *_opengl,
 		opengl->sphere->view->proj,
 		opengl->sphere->view->view,
 		px, py, pz);
+}
+
+static void grits_opengl_unproject(GritsViewer *_opengl,
+		gdouble px, gdouble py, gdouble pz,
+		gdouble *lat, gdouble *lon, gdouble *elev)
+{
+	GritsOpenGL *opengl = GRITS_OPENGL(_opengl);
+	gdouble x, y, z;
+	if (pz < 0) {
+		gfloat tmp = 0;
+		glReadPixels(px, py, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &tmp);
+		pz = tmp;
+	}
+	gluUnProject(px, py, pz,
+		opengl->sphere->view->model,
+		opengl->sphere->view->proj,
+		opengl->sphere->view->view,
+		&x, &y, &z);
+	xyz2lle(x, y, z, lat, lon, elev);
+	//g_message("GritsOpenGL: unproject - "
+	//		"%4.0lf,%4.0lf,(%5.3lf) -> "
+	//		"%8.0lf,%8.0lf,%8.0lf -> "
+	//		"%6.2lf,%7.2lf,%4.0lf",
+	//	px, py, pz, x, y, z, *lat, *lon, *elev);
 }
 
 static void grits_opengl_set_height_func(GritsViewer *_opengl, GritsBounds *bounds,
@@ -615,6 +644,7 @@ static void grits_opengl_class_init(GritsOpenGLClass *klass)
 	GritsViewerClass *viewer_class = GRITS_VIEWER_CLASS(klass);
 	viewer_class->center_position   = grits_opengl_center_position;
 	viewer_class->project           = grits_opengl_project;
+	viewer_class->unproject         = grits_opengl_unproject;
 	viewer_class->clear_height_func = grits_opengl_clear_height_func;
 	viewer_class->set_height_func   = grits_opengl_set_height_func;
 	viewer_class->add               = grits_opengl_add;

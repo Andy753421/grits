@@ -131,6 +131,9 @@ struct _GritsViewerClass {
 	void (*project)          (GritsViewer *viewer,
 	                          gdouble lat, gdouble lon, gdouble elev,
 	                          gdouble *px, gdouble *py, gdouble *pz);
+	void (*unproject)        (GritsViewer *viewer,
+	                          gdouble px, gdouble py,gdouble pz,
+	                          gdouble *lat, gdouble *lon, gdouble *elev);
 
 	void (*clear_height_func)(GritsViewer *viewer);
 	void (*set_height_func)  (GritsViewer *viewer, GritsBounds *bounds,
@@ -171,6 +174,9 @@ void grits_viewer_center_position(GritsViewer *viewer,
 void grits_viewer_project(GritsViewer *viewer,
 		gdouble lat, gdouble lon, gdouble elev,
 		gdouble *px, gdouble *py, gdouble *pz);
+void grits_viewer_unproject(GritsViewer *viewer,
+		gdouble px, gdouble py, gdouble pz,
+		gdouble *lat, gdouble *lon, gdouble *elev);
 
 void grits_viewer_clear_height_func(GritsViewer *viewer);
 void grits_viewer_set_height_func(GritsViewer *viewer, GritsBounds *bounds,

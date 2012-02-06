@@ -188,22 +188,39 @@ static gboolean on_configure(GritsOpenGL *opengl, GdkEventConfigure *event, gpoi
 
 static gboolean _draw_level(gpointer key, gpointer value, gpointer user_data)
 {
-	g_debug("GritsOpenGL: _draw_level - level=%-4ld", (glong)key);
 	GritsOpenGL *opengl = user_data;
+	glong lnum = (glong)key;
 	struct RenderLevel *level = value;
+
+	g_debug("GritsOpenGL: _draw_level - level=%-4ld", lnum);
 	int nsorted = 0, nunsorted = 0;
 	GList *cur = NULL;
 
-	/* Draw opaque objects without sorting */
-	glDepthMask(TRUE);
-	glClear(GL_DEPTH_BUFFER_BIT);
+	/* Configure individual levels */
+	if (lnum < GRITS_LEVEL_WORLD) {
+		/* Disable depth for background levels */
+		glDepthMask(FALSE);
+		glDisable(GL_ALPHA_TEST);
+	} else if (lnum < GRITS_LEVEL_OVERLAY) {
+		/* Enable depth and alpha for world levels */
+		glEnable(GL_ALPHA_TEST);
+		glAlphaFunc(GL_GREATER, 0.1);
+		glDepthMask(TRUE);
+	} else {
+		/* Disable depth for Overlay/HUD levels */
+		// This causes rendering glitches not sure why..
+		//glDepthMask(FALSE);
+	}
+
+	/* Draw unsorted objects without depth testing,
+	 * these are polygons, etc, rather than physical objects */
+	glDisable(GL_DEPTH_TEST);
 	for (cur = level->unsorted.next; cur; cur = cur->next, nunsorted++)
 		grits_object_draw(GRITS_OBJECT(cur->data), opengl);
 
-	/* Freeze depth buffer and draw transparent objects sorted */
-	/* TODO: sorting */
-	//glDepthMask(FALSE);
-	glAlphaFunc(GL_GREATER, 0.1);
+	/* Draw sorted objects using depth testing
+	 * These are things that are actually part of the world */
+	glEnable(GL_DEPTH_TEST);
 	for (cur = level->sorted.next; cur; cur = cur->next, nsorted++)
 		grits_object_draw(GRITS_OBJECT(cur->data), opengl);
 
@@ -220,7 +237,7 @@ static gboolean on_expose(GritsOpenGL *opengl, GdkEventExpose *event, gpointer _
 
 	gtk_gl_begin(GTK_WIDGET(opengl));
 
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	_set_visuals(opengl);
 #ifdef ROAM_DEBUG
@@ -233,13 +250,9 @@ static gboolean on_expose(GritsOpenGL *opengl, GdkEventExpose *event, gpointer _
 	//roam_sphere_draw_normals(opengl->sphere);
 #else
 	g_mutex_lock(opengl->objects_lock);
-	g_tree_foreach(opengl->objects, _draw_level, opengl);
-	if (opengl->wireframe) {
-		glClear(GL_DEPTH_BUFFER_BIT);
+	if (opengl->wireframe)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		roam_sphere_draw(opengl->sphere);
-		g_tree_foreach(opengl->objects, _draw_level, opengl);
-	}
+	g_tree_foreach(opengl->objects, _draw_level, opengl);
 	g_mutex_unlock(opengl->objects_lock);
 #endif
 

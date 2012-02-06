@@ -300,7 +300,7 @@ GritsPluginElev *grits_plugin_elev_new(GritsViewer *viewer)
 
 	/* Add renderers */
 	if (LOAD_OPENGL)
-		grits_viewer_add(viewer, GRITS_OBJECT(elev->tiles), GRITS_LEVEL_WORLD, 0);
+		grits_viewer_add(viewer, GRITS_OBJECT(elev->tiles), GRITS_LEVEL_WORLD, FALSE);
 
 	return elev;
 }

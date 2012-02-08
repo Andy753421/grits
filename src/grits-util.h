@@ -180,7 +180,7 @@ void grits_bounds_set_bounds(GritsBounds *bounds,
  *
  * Used by GritsOpenGL to set up the drawing window
  */
-#define FOV_DIST   2000.0
+#define FOV_DIST   2078.46
 
 /**
  * MPPX:
@@ -190,7 +190,7 @@ void grits_bounds_set_bounds(GritsBounds *bounds,
  *
  * Returns: the resolution in meters per pixel
  */
-#define MPPX(dist) (4*dist/FOV_DIST)
+#define MPPX(dist) (dist/FOV_DIST)
 
 void lle2xyz(gdouble lat, gdouble lon, gdouble elev,
 		gdouble *x, gdouble *y, gdouble *z);

@@ -103,7 +103,7 @@ void _load_marker(GritsPluginTest *test)
 	GRITS_OBJECT(test->marker)->center.lat  =  38.841847;
 	GRITS_OBJECT(test->marker)->center.lon  = -90.491982;
 	GRITS_OBJECT(test->marker)->center.elev =   0.0;
-	GRITS_OBJECT(test->marker)->lod         = EARTH_R;
+	GRITS_OBJECT(test->marker)->lod         = EARTH_R*3;
 	grits_viewer_add(test->viewer, GRITS_OBJECT(test->marker), GRITS_LEVEL_OVERLAY, FALSE);
 	/* These do not work on marker yet */
 	//g_signal_connect(test->marker, "enter",        G_CALLBACK(on_marker_enter),  NULL);

@@ -74,7 +74,7 @@ static void _set_visuals(GritsOpenGL *opengl)
 
 	grits_viewer_get_location(GRITS_VIEWER(opengl), &lat, &lon, &elev);
 	glViewport(0, 0, width, height);
-	gluPerspective(rad2deg(ang)*2, width/height, near, far);
+	gluPerspective(rad2deg(ang), width/height, near, far);
 
 	/* Setup camera and lighting */
 	glMatrixMode(GL_MODELVIEW);

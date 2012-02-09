@@ -48,6 +48,7 @@ struct _GritsMarker {
 	gchar     *label;
 	cairo_t   *cairo;
 	guint      tex;
+	gboolean   ortho;
 
 	cairo_surface_t *icon_img;
 

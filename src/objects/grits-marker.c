@@ -78,36 +78,8 @@ static void render_icon(GritsMarker *marker)
 {
 	g_assert(marker->icon_img != NULL);
 
-	/* This code assumes the icon is an image pointing toward 0 degrees
-	* (ie. north/up).  If marker->flip is set, then it will rotate the
-	* icon appropriately then reflect it across the vertical axis so
-	* it's never upside down. */
-	gdouble flip = 1.0;
-	gdouble angle = marker->angle % 360;
-	if (marker->flip && (angle < 360 && angle > 180)) {
-		/* if icon rotates to the left half it will be upside down */
-		flip = -1.0; /* flip horizontally */
-	}
-
-	cairo_save(marker->cairo);
-
 	/* move to marker location */
 	cairo_translate(marker->cairo, marker->xoff, marker->yoff);
-
-	/* perform rotation and flip in one transformation */
-	gdouble C = cos(angle*(M_PI/180.0));
-	gdouble S = sin(angle*(M_PI/180.0));
-	gdouble fx = flip; 
-	gdouble fy = 1.0;
-	gdouble tx = 0.0;
-	gdouble ty = 0.0;
-	cairo_matrix_t matrix;
-	cairo_matrix_init(&matrix,
-	        fx*C, fx*S,
-	        -S*fy, C*fy,
-	        C*tx*(1-fx)-S*ty*(fy-1)+tx-C*tx+S*ty,
-	        S*tx*(1-fx)+C*ty*(fy-1)+ty-S*tx-C*ty);
-	cairo_transform(marker->cairo, &matrix);
 
 	/* center image */
 	cairo_translate(marker->cairo, -marker->icon_width/2,
@@ -116,7 +88,6 @@ static void render_icon(GritsMarker *marker)
 	cairo_set_source_surface(marker->cairo, marker->icon_img, 0, 0);
 
 	cairo_paint(marker->cairo);
-	cairo_restore(marker->cairo);
 }
 
 static void render_all(GritsMarker *marker)
@@ -140,8 +111,8 @@ static void render_all(GritsMarker *marker)
 	glTexImage2D(GL_TEXTURE_2D, 0, 4, marker->width, marker->height,
 	        0, GL_BGRA, GL_UNSIGNED_BYTE,
 	        cairo_image_surface_get_data(cairo_get_target(marker->cairo)));
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 }
 
 
@@ -265,28 +236,46 @@ static void grits_marker_draw(GritsObject *_marker, GritsOpenGL *opengl)
 {
 	GritsMarker *marker = GRITS_MARKER(_marker);
 	GritsPoint  *point  = grits_object_center(marker);
-	gdouble px, py, pz;
-	grits_viewer_project(GRITS_VIEWER(opengl),
-			point->lat, point->lon, point->elev,
-			&px, &py, &pz);
-
-	gint win_width  = GTK_WIDGET(opengl)->allocation.width;
-	gint win_height = GTK_WIDGET(opengl)->allocation.height;
-	py = win_height - py;
-	if (pz > 1)
-		return;
-
-	//g_debug("GritsOpenGL: draw_marker - %s pz=%f ", marker->label, pz);
 
 	cairo_surface_t *surface = cairo_get_target(marker->cairo);
 	gdouble width  = cairo_image_surface_get_width(surface);
 	gdouble height = cairo_image_surface_get_height(surface);
 
-	glMatrixMode(GL_PROJECTION); glLoadIdentity();
-	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
-	glOrtho(0, win_width, win_height, 0, -1, 1);
-	glTranslated(px - marker->xoff,
-	             py - marker->yoff, 0);
+	if (marker->ortho) {
+		gdouble px, py, pz;
+		grits_viewer_project(GRITS_VIEWER(opengl),
+				point->lat, point->lon, point->elev,
+				&px, &py, &pz);
+
+		gint win_width  = GTK_WIDGET(opengl)->allocation.width;
+		gint win_height = GTK_WIDGET(opengl)->allocation.height;
+		if (pz > 1)
+			return;
+
+		glMatrixMode(GL_PROJECTION); glLoadIdentity();
+		glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
+		glOrtho(0, win_width, win_height, 0, 1, -1);
+		glTranslated(px, win_height-py, 0);
+		glRotatef(marker->angle, 0, 0, -1);
+		glTranslated(-marker->xoff, -marker->yoff, 0);
+	} else {
+		gdouble scale, eye[3], pos[3] =
+			{point->lat, point->lon, point->elev};
+		grits_viewer_get_location(GRITS_VIEWER(opengl),
+		       &eye[0], &eye[1], &eye[2]);
+		lle2xyz(eye[0],  eye[1],  eye[2],
+		       &eye[0], &eye[1], &eye[2]);
+		lle2xyz(pos[0],  pos[1],  pos[2],
+		       &pos[0], &pos[1], &pos[2]);
+		scale = MPPX(distd(eye, pos));
+
+		glRotatef(marker->angle, 0, 0, -1);
+		glRotatef(180, 1, 0, 0);
+		glScalef(scale, scale, 1);
+		glTranslated(-marker->xoff, -marker->yoff, 0);
+	}
+
+	//g_debug("GritsOpenGL: draw_marker - %s pz=%f ", marker->label, pz);
 
 	glDisable(GL_LIGHTING);
 	glDisable(GL_COLOR_MATERIAL);
@@ -295,10 +284,10 @@ static void grits_marker_draw(GritsObject *_marker, GritsOpenGL *opengl)
 	glBindTexture(GL_TEXTURE_2D, marker->tex);
 	glDisable(GL_CULL_FACE);
 	glBegin(GL_QUADS);
-	glTexCoord2f(1, 0); glVertex3f(width, 0     , 0);
-	glTexCoord2f(1, 1); glVertex3f(width, height, 0);
-	glTexCoord2f(0, 1); glVertex3f(0    , height, 0);
-	glTexCoord2f(0, 0); glVertex3f(0    , 0     , 0);
+	glTexCoord2f(1, 0); glVertex3f(width, 0     , 0); // 0 - 3    0 
+	glTexCoord2f(1, 1); glVertex3f(width, height, 0); // 1 - |    | 
+	glTexCoord2f(0, 1); glVertex3f(0    , height, 0); // 2 - |    | 
+	glTexCoord2f(0, 0); glVertex3f(0    , 0     , 0); // 3 - 2----1 
 	glEnd();
 }
 
@@ -307,6 +296,7 @@ static void grits_marker_draw(GritsObject *_marker, GritsOpenGL *opengl)
 G_DEFINE_TYPE(GritsMarker, grits_marker, GRITS_TYPE_OBJECT);
 static void grits_marker_init(GritsMarker *marker)
 {
+	marker->ortho = TRUE;
 }
 
 static void grits_marker_finalize(GObject *_marker)

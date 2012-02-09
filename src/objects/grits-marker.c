@@ -31,9 +31,121 @@
  */
 
 #include <config.h>
+#include <math.h>
 #include "gtkgl.h"
 #include "grits-marker.h"
 
+/* Texture setup functions */
+static void render_point(GritsMarker *marker)
+{
+	/* Draw outline */
+	cairo_set_source_rgba(marker->cairo, 0, 0, 0, 1);
+	cairo_set_line_width(marker->cairo, marker->outline*2);
+
+	cairo_arc(marker->cairo, marker->xoff, marker->yoff, marker->radius,
+	          0, 2*G_PI);
+	cairo_stroke(marker->cairo);
+
+	/* Draw filler */
+	cairo_set_source_rgba(marker->cairo, 1, 1, 1, 1);
+
+	cairo_arc(marker->cairo, marker->xoff, marker->yoff, marker->radius,
+	          0, 2*G_PI);
+	cairo_fill(marker->cairo);
+}
+
+static void render_label(GritsMarker *marker)
+{
+	g_assert(marker->label);
+
+	cairo_set_source_rgba(marker->cairo, 0, 0, 0, 1);
+	cairo_select_font_face(marker->cairo, "sans-serif",
+			CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+	cairo_set_font_size(marker->cairo, 13);
+	cairo_move_to(marker->cairo, marker->xoff + (marker->icon_width  / 2),
+	                             marker->yoff - (marker->icon_height / 2));
+	cairo_text_path(marker->cairo, marker->label);
+	cairo_stroke(marker->cairo);
+
+	/* Draw filler */
+	cairo_set_source_rgba(marker->cairo, 1, 1, 1, 1);
+	cairo_move_to(marker->cairo, marker->xoff + (marker->icon_width  / 2),
+	                             marker->yoff - (marker->icon_height / 2));
+	cairo_show_text(marker->cairo, marker->label);
+}
+
+static void render_icon(GritsMarker *marker)
+{
+	g_assert(marker->icon_img != NULL);
+
+	/* This code assumes the icon is an image pointing toward 0 degrees
+	* (ie. north/up).  If marker->flip is set, then it will rotate the
+	* icon appropriately then reflect it across the vertical axis so
+	* it's never upside down. */
+	gdouble flip = 1.0;
+	gdouble angle = marker->angle % 360;
+	if (marker->flip && (angle < 360 && angle > 180)) {
+		/* if icon rotates to the left half it will be upside down */
+		flip = -1.0; /* flip horizontally */
+	}
+
+	cairo_save(marker->cairo);
+
+	/* move to marker location */
+	cairo_translate(marker->cairo, marker->xoff, marker->yoff);
+
+	/* perform rotation and flip in one transformation */
+	gdouble C = cos(angle*(M_PI/180.0));
+	gdouble S = sin(angle*(M_PI/180.0));
+	gdouble fx = flip; 
+	gdouble fy = 1.0;
+	gdouble tx = 0.0;
+	gdouble ty = 0.0;
+	cairo_matrix_t matrix;
+	cairo_matrix_init(&matrix,
+	        fx*C, fx*S,
+	        -S*fy, C*fy,
+	        C*tx*(1-fx)-S*ty*(fy-1)+tx-C*tx+S*ty,
+	        S*tx*(1-fx)+C*ty*(fy-1)+ty-S*tx-C*ty);
+	cairo_transform(marker->cairo, &matrix);
+
+	/* center image */
+	cairo_translate(marker->cairo, -marker->icon_width/2,
+	                               -marker->icon_height/2);
+
+	cairo_set_source_surface(marker->cairo, marker->icon_img, 0, 0);
+
+	cairo_paint(marker->cairo);
+	cairo_restore(marker->cairo);
+}
+
+static void render_all(GritsMarker *marker)
+{
+	g_assert(marker);
+	if (marker->display_mask & GRITS_MARKER_DMASK_ICON)
+		render_icon(marker);
+
+	if (marker->display_mask & GRITS_MARKER_DMASK_POINT)
+		render_point(marker);
+
+	if (marker->display_mask & GRITS_MARKER_DMASK_LABEL)
+		render_label(marker);
+
+	/* Load GL texture */
+	glEnable(GL_TEXTURE_2D);
+	glGenTextures(1, &marker->tex);
+	glBindTexture(GL_TEXTURE_2D, marker->tex);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, 4, marker->width, marker->height,
+	        0, GL_BGRA, GL_UNSIGNED_BYTE,
+	        cairo_image_surface_get_data(cairo_get_target(marker->cairo)));
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+}
+
+
+/* Constructors */
 /**
  * grits_marker_new:
  * @label: a short description of the marker
@@ -44,56 +156,109 @@
  */
 GritsMarker *grits_marker_new(const gchar *label)
 {
-	//g_debug("GritsMarker: new - %s", label);
-	static const gdouble OUTLINE =   2;
-	static const gdouble RADIUS  =   3;
-	static const gdouble WIDTH   = 128;
-	static const gdouble HEIGHT  =  32;
-
 	GritsMarker *marker = g_object_new(GRITS_TYPE_MARKER, NULL);
-	marker->xoff  = RADIUS+OUTLINE;
-	marker->yoff  = HEIGHT-(RADIUS+OUTLINE);
-	marker->label = g_strdup(label);
+
+	marker->display_mask = GRITS_MARKER_DMASK_POINT |
+	                       GRITS_MARKER_DMASK_LABEL;
+
+	//g_debug("GritsMarker: new - %s", label);
+	/* specify size of point and size of surface */
+	marker->outline =   2;
+	marker->radius  =   3;
+	marker->width   = 128;
+	marker->height  =  32;
+	marker->icon_width  = marker->radius * 2;
+	marker->icon_height = marker->radius * 3;
+
+	marker->xoff  = marker->radius+marker->outline;
+	marker->yoff  = marker->height-(marker->radius+marker->outline);
 	marker->cairo = cairo_create(cairo_image_surface_create(
-			CAIRO_FORMAT_ARGB32, WIDTH, HEIGHT));
+			CAIRO_FORMAT_ARGB32, marker->width, marker->height));
 
-	cairo_select_font_face(marker->cairo, "sans-serif",
-			CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-	cairo_set_font_size(marker->cairo, 13);
+	marker->label = g_strdup(label);
 
-	/* Draw outline */
-	cairo_set_source_rgba(marker->cairo, 0, 0, 0, 1);
-	cairo_set_line_width(marker->cairo, OUTLINE*2);
-
-	cairo_arc(marker->cairo, marker->xoff, marker->yoff, RADIUS, 0, 2*G_PI);
-	cairo_stroke(marker->cairo);
-
-	cairo_move_to(marker->cairo, marker->xoff+4, marker->yoff-8);
-	cairo_text_path(marker->cairo, marker->label);
-	cairo_stroke(marker->cairo);
-
-	/* Draw filler */
-	cairo_set_source_rgba(marker->cairo, 1, 1, 1, 1);
-
-	cairo_arc(marker->cairo, marker->xoff, marker->yoff, RADIUS, 0, 2*G_PI);
-	cairo_fill(marker->cairo);
-
-	cairo_move_to(marker->cairo, marker->xoff+4, marker->yoff-8);
-	cairo_show_text(marker->cairo, marker->label);
-
-	/* Load GL texture */
-	glEnable(GL_TEXTURE_2D);
-	glGenTextures(1, &marker->tex);
-	glBindTexture(GL_TEXTURE_2D, marker->tex);
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glPixelStorei(GL_PACK_ALIGNMENT, 1);
-	glTexImage2D(GL_TEXTURE_2D, 0, 4, WIDTH, HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-			cairo_image_surface_get_data(cairo_get_target(marker->cairo)));
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	render_all(marker);
 
 	return marker;
 }
+
+/**
+ * grits_marker_icon_new:
+ * @label:        The label to display if GRITS_MARKER_DMASK_LABEL is set
+ * @filename:     The filename of the icon
+ * @angle:        The angle to rotate the icon (0 is north)
+ * @flip:         Whether to flip the image so that it's never upside down.
+ *                Useful for non-symmetric icons which have an "up".
+ * @display_mask: A bitmask which specifies which items to display.
+ *
+ * Create a new marker with a label, point, icon (png), or any
+ * combination of the above.
+ *
+ * Returns: the new #GritsMarker
+ */
+GritsMarker *grits_marker_icon_new(const gchar *label, const gchar *filename,
+    guint angle, gboolean flip, guint display_mask)
+{
+	GritsMarker *marker = g_object_new(GRITS_TYPE_MARKER, NULL);
+
+	marker->label = g_strdup(label);
+	marker->angle = angle;
+	marker->flip = flip;
+	marker->display_mask = display_mask;
+
+	if (display_mask & GRITS_MARKER_DMASK_ICON) {
+		g_assert(filename != NULL);
+		g_debug("GritsMarker: marker_icon_new - marker image %s",
+		        filename);
+		marker->icon_img = cairo_image_surface_create_from_png(filename);
+		if (cairo_surface_status(marker->icon_img)) {
+			g_warning("GritsMarker: marker_icon_new - "
+			          "error reading file %s", filename);
+			/* convert it to a point, better than nothing */
+			marker->display_mask &= ~GRITS_MARKER_DMASK_ICON;
+			marker->display_mask |=  GRITS_MARKER_DMASK_POINT;
+			marker->icon_width = 4;
+			marker->icon_height = 8;
+
+		} else {
+			marker->icon_width =
+			    cairo_image_surface_get_width(marker->icon_img);
+			marker->icon_height =
+			    cairo_image_surface_get_height(marker->icon_img);
+		}
+	} else {
+		marker->icon_img = NULL;
+		marker->icon_width = 4;	/* room for the point if there is one */
+		marker->icon_height = 8;
+	}
+	g_debug("GritsMarker: marker_icon_new - width = %d, height = %d",
+		marker->icon_width, marker->icon_height);
+
+	marker->outline =   2;
+	marker->radius  =   3;
+	/* this is the surface size, a guess really */
+	marker->width   = marker->icon_width  + 128;
+	marker->height  = marker->icon_height + 64;
+
+	marker->xoff  = marker->width/2;
+	marker->yoff  = marker->height/2;
+	marker->cairo = cairo_create(cairo_image_surface_create(
+			CAIRO_FORMAT_ARGB32, marker->width, marker->height));
+	/* clear the surface just in case */
+	cairo_set_operator(marker->cairo, CAIRO_OPERATOR_SOURCE);
+	//cairo_set_source_rgba(marker->cairo, 1.0, 0.0, 0.0, 0.3); // debug
+	cairo_set_source_rgba(marker->cairo, 1.0, 0.0, 0.0, 0.0);
+	cairo_paint(marker->cairo);
+	cairo_set_operator(marker->cairo, CAIRO_OPERATOR_OVER);
+
+	render_all(marker);
+
+	if (marker->icon_img)
+		cairo_surface_destroy(marker->icon_img);
+
+	return marker;
+}
+
 
 /* Drawing */
 static void grits_marker_draw(GritsObject *_marker, GritsOpenGL *opengl)
@@ -136,6 +301,7 @@ static void grits_marker_draw(GritsObject *_marker, GritsOpenGL *opengl)
 	glTexCoord2f(0, 0); glVertex3f(0    , 0     , 0);
 	glEnd();
 }
+
 
 /* GObject code */
 G_DEFINE_TYPE(GritsMarker, grits_marker, GRITS_TYPE_OBJECT);

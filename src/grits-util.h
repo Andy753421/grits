@@ -180,7 +180,7 @@ void grits_bounds_set_bounds(GritsBounds *bounds,
  *
  * Used by GritsOpenGL to set up the drawing window
  */
-#define FOV_DIST   2078.46
+#define FOV_DIST   (1039.23)
 
 /**
  * MPPX:

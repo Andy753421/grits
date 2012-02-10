@@ -67,7 +67,7 @@ static void _set_visuals(GritsOpenGL *opengl)
 
 	double width  = GTK_WIDGET(opengl)->allocation.width;
 	double height = GTK_WIDGET(opengl)->allocation.height;
-	double ang    = atan(height/FOV_DIST);
+	double ang    = atan((height/2)/FOV_DIST)*2;
 	double atmos  = 100000;
 	double near   = MAX(elev*0.75 - atmos, 50); // View 100km of atmosphere
 	double far    = elev + 2*EARTH_R + atmos;   // on both sides of the earth

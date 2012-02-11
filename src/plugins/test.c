@@ -32,21 +32,21 @@
 
 static void on_poly_enter(GritsPoly *poly)
 {
-	g_debug("on_poly_enter");
+	g_debug("GritsPluginTest: on_poly_enter");
 	poly->color[3] = 0.50;
 	grits_object_queue_draw(GRITS_OBJECT(poly));
 }
 
 static void on_poly_leave(GritsPoly *poly)
 {
-	g_debug("on_poly_leave");
+	g_debug("GritsPluginTest: on_poly_leave");
 	poly->color[3] = 0.2;
 	grits_object_queue_draw(GRITS_OBJECT(poly));
 }
 
 static void on_poly_button(GritsPoly *poly, GdkEventButton *event)
 {
-	g_debug("on_poly_button");
+	g_debug("GritsPluginTest: on_poly_button");
 	static int i = 0;
 	gdouble colors[][3] = {
 		{1, 0, 0}, {1, 1, 0},
@@ -60,12 +60,14 @@ static void on_poly_button(GritsPoly *poly, GdkEventButton *event)
 
 static void on_poly_key(GritsPoly *poly, GdkEventKey *event)
 {
-	g_debug("on_poly_key");
+	g_debug("GritsPluginTest: on_poly_key - %d", event->keyval);
 	gdouble colors[0xff][3] = {
 		[GDK_r] {1, 0, 0},
 		[GDK_g] {0, 1, 0},
 		[GDK_b] {0, 0, 1},
 	};
+	if (event->keyval >= G_N_ELEMENTS(colors))
+		return;
 	int key = event->keyval;
 	memcpy(poly->color, colors[key], sizeof(gdouble)*3);
 	grits_object_queue_draw(GRITS_OBJECT(poly));
@@ -73,7 +75,7 @@ static void on_poly_key(GritsPoly *poly, GdkEventKey *event)
 
 static void on_marker_enter(GritsMarker *marker, GritsViewer *viewer)
 {
-	g_debug("on_marker_enter");
+	g_debug("GritsPluginTest: on_marker_enter");
 	GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(viewer));
 	GdkCursor *cursor = gdk_cursor_new(GDK_HAND1);
 	gdk_window_set_cursor(window, cursor);
@@ -81,14 +83,14 @@ static void on_marker_enter(GritsMarker *marker, GritsViewer *viewer)
 
 static void on_marker_leave(GritsMarker *marker, GritsViewer *viewer)
 {
-	g_debug("on_marker_leave");
+	g_debug("GritsPluginTest: on_marker_leave");
 	GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(viewer));
 	gdk_window_set_cursor(window, NULL);
 }
 
 static void on_marker_button(GritsMarker *marker, GdkEventButton *event)
 {
-	g_debug("on_marker_button");
+	g_debug("GritsPluginTest: on_marker_button");
 	GtkWidget *dialog = gtk_dialog_new_with_buttons(
 			"St. Charles!", NULL, 0, GTK_STOCK_OK, GTK_RESPONSE_OK, NULL);
 	gtk_dialog_run(GTK_DIALOG(dialog));

@@ -126,6 +126,7 @@ static gboolean _grits_tile_precise(GritsPoint *eye, GritsBounds *bounds,
 	 * (yet?) test if the tile would be drawn */
 	gdouble scale = eye->elev / min_dist;
 	view_res /= scale;
+	view_res *= 1.8;
 	//view_res /= 1.4; /* make it a little nicer, not sure why this is needed */
 	//g_message("tile=(%7.2f %7.2f %7.2f %7.2f) "
 	//          "eye=(%9.1f %9.1f %9.1f) "

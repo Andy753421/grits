@@ -215,14 +215,17 @@ void grits_tile_update(GritsTile *tile, GritsPoint *eye,
 		return;
 	}
 
-	/* Need more resolution, split tile and update recursively */
-	if (!tile->children[0][0]) {
-		switch (tile->proj) {
-		case GRITS_PROJ_LATLON:   _grits_tile_split_latlon(tile);   break;
-		case GRITS_PROJ_MERCATOR: _grits_tile_split_mercator(tile); break;
+	/* Split tile if needed */
+	grits_tile_foreach(tile, child) {
+		if (child == NULL) {
+			switch (tile->proj) {
+			case GRITS_PROJ_LATLON:   _grits_tile_split_latlon(tile);   break;
+			case GRITS_PROJ_MERCATOR: _grits_tile_split_mercator(tile); break;
+			}
 		}
 	}
 
+	/* Update recursively */
 	grits_tile_foreach(tile, child) {
 		GRITS_OBJECT(child)->hidden = FALSE;
 		grits_tile_update(child, eye, res, width, height,

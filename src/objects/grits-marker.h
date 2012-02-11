@@ -46,6 +46,7 @@ struct _GritsMarker {
 	gint       xoff, yoff;		    /* center point offset */
 	gint       icon_width, icon_height; /* size of icon for offsets */
 	gchar     *label;
+	gchar     *file;
 	cairo_t   *cairo;
 	guint      tex;
 	gboolean   ortho;

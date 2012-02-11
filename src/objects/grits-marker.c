@@ -148,8 +148,6 @@ GritsMarker *grits_marker_new(const gchar *label)
 
 	marker->label = g_strdup(label);
 
-	render_all(marker);
-
 	return marker;
 }
 
@@ -207,6 +205,7 @@ GritsMarker *grits_marker_icon_new(const gchar *label, const gchar *filename,
 
 	marker->outline =   2;
 	marker->radius  =   3;
+
 	/* this is the surface size, a guess really */
 	marker->width   = marker->icon_width  + 128;
 	marker->height  = marker->icon_height + 64;
@@ -215,6 +214,7 @@ GritsMarker *grits_marker_icon_new(const gchar *label, const gchar *filename,
 	marker->yoff  = marker->height/2;
 	marker->cairo = cairo_create(cairo_image_surface_create(
 			CAIRO_FORMAT_ARGB32, marker->width, marker->height));
+
 	/* clear the surface just in case */
 	cairo_set_operator(marker->cairo, CAIRO_OPERATOR_SOURCE);
 	//cairo_set_source_rgba(marker->cairo, 1.0, 0.0, 0.0, 0.3); // debug
@@ -240,6 +240,9 @@ static void grits_marker_draw(GritsObject *_marker, GritsOpenGL *opengl)
 	cairo_surface_t *surface = cairo_get_target(marker->cairo);
 	gdouble width  = cairo_image_surface_get_width(surface);
 	gdouble height = cairo_image_surface_get_height(surface);
+
+	if (!marker->tex)
+		render_all(marker);
 
 	if (marker->ortho) {
 		gdouble px, py, pz;
@@ -303,12 +306,14 @@ static void grits_marker_finalize(GObject *_marker)
 {
 	//g_debug("GritsMarker: finalize - %s", marker->label);
 	GritsMarker *marker = GRITS_MARKER(_marker);
-	glDeleteTextures(1, &marker->tex);
-	cairo_surface_t *surface = cairo_get_target(marker->cairo);
-	cairo_surface_destroy(surface);
-	cairo_destroy(marker->cairo);
+	if (marker->tex)
+		glDeleteTextures(1, &marker->tex);
+	if (marker->cairo) {
+		cairo_surface_t *surface = cairo_get_target(marker->cairo);
+		cairo_surface_destroy(surface);
+		cairo_destroy(marker->cairo);
+	}
 	g_free(marker->label);
-	glDeleteTextures(1, &marker->tex);
 }
 
 static void grits_marker_class_init(GritsMarkerClass *klass)

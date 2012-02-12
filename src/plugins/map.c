@@ -240,15 +240,16 @@ static void grits_plugin_map_dispose(GObject *gobject)
 	map->aborted = TRUE;
 	/* Drop references */
 	if (map->viewer) {
-		g_signal_handler_disconnect(map->viewer, map->sigid);
-		grits_viewer_remove(map->viewer, GRITS_OBJECT(map->tiles));
+		GritsViewer *viewer = map->viewer;
+		map->viewer = NULL;
+		g_signal_handler_disconnect(viewer, map->sigid);
+		grits_viewer_remove(viewer, GRITS_OBJECT(map->tiles));
 		soup_session_abort(map->tms->http->soup);
 		//soup_session_abort(map->wms->http->soup);
 		g_thread_pool_free(map->threads, TRUE, TRUE);
 		while (gtk_events_pending())
 			gtk_main_iteration();
-		g_object_unref(map->viewer);
-		map->viewer = NULL;
+		g_object_unref(viewer);
 	}
 	G_OBJECT_CLASS(grits_plugin_map_parent_class)->dispose(gobject);
 }

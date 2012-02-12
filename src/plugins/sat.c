@@ -219,14 +219,15 @@ static void grits_plugin_sat_dispose(GObject *gobject)
 	sat->aborted = TRUE;
 	/* Drop references */
 	if (sat->viewer) {
-		g_signal_handler_disconnect(sat->viewer, sat->sigid);
-		grits_viewer_remove(sat->viewer, GRITS_OBJECT(sat->tiles));
+		GritsViewer *viewer = sat->viewer;
+		sat->viewer = NULL;
+		g_signal_handler_disconnect(viewer, sat->sigid);
+		grits_viewer_remove(viewer, GRITS_OBJECT(sat->tiles));
 		soup_session_abort(sat->wms->http->soup);
 		g_thread_pool_free(sat->threads, TRUE, TRUE);
 		while (gtk_events_pending())
 			gtk_main_iteration();
-		g_object_unref(sat->viewer);
-		sat->viewer = NULL;
+		g_object_unref(viewer);
 	}
 	G_OBJECT_CLASS(grits_plugin_sat_parent_class)->dispose(gobject);
 }

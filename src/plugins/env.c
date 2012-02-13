@@ -94,18 +94,17 @@ GritsPluginEnv *grits_plugin_env_new(GritsViewer *viewer, GritsPrefs *prefs)
 	GritsPluginEnv *env = g_object_new(GRITS_TYPE_PLUGIN_ENV, NULL);
 	env->viewer = g_object_ref(viewer);
 
-	/* Create objects */
-	GritsCallback *callback   = grits_callback_new(expose, env);
-	GritsTile     *background = grits_tile_new(NULL, NORTH, SOUTH, EAST, WEST);
-	glGenTextures(1, &env->tex);
-	background->data = &env->tex;
+	/* Add sky */
+	GritsCallback *callback = grits_callback_new(expose, env);
+	grits_viewer_add(viewer, GRITS_OBJECT(callback), GRITS_LEVEL_BACKGROUND, FALSE);
+	env->refs = g_list_prepend(env->refs, callback);
 
-	/* Add renderers */
-	gpointer ref1, ref2;
-	ref1 = grits_viewer_add(viewer, GRITS_OBJECT(callback),   GRITS_LEVEL_BACKGROUND, FALSE);
-	ref2 = grits_viewer_add(viewer, GRITS_OBJECT(background), GRITS_LEVEL_BACKGROUND, FALSE);
-	env->refs = g_list_prepend(env->refs, ref1);
-	env->refs = g_list_prepend(env->refs, ref2);
+	/* Add background */
+	//GritsTile *background = grits_tile_new(NULL, NORTH, SOUTH, EAST, WEST);
+	//glGenTextures(1, &env->tex);
+	//background->data = &env->tex;
+	//grits_viewer_add(viewer, GRITS_OBJECT(background), GRITS_LEVEL_BACKGROUND, FALSE);
+	//env->refs = g_list_prepend(env->refs, background);
 
 	return env;
 }

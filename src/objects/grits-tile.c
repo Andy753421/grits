@@ -64,8 +64,10 @@ GritsTile *grits_tile_new(GritsTile *parent,
 	tile->atime  = time(NULL);
 	grits_bounds_set_bounds(&tile->coords, 0, 1, 1, 0);
 	grits_bounds_set_bounds(&tile->edge, n, s, e, w);
-	if (parent)
-		tile->proj = parent->proj;
+	if (parent) {
+		tile->proj   = parent->proj;
+		tile->zindex = parent->zindex+1;
+	}
 	return tile;
 }
 
@@ -149,12 +151,18 @@ static void _grits_tile_split_latlon(GritsTile *tile)
 	const gdouble lon_step = lon_dist / cols;
 
 	int row, col;
-	grits_tile_foreach_index(tile, row, col)
-		tile->children[row][col] = grits_tile_new(tile,
-			tile->edge.n - lat_step*(row+0),  // north
-			tile->edge.n - lat_step*(row+1),  // south
-			tile->edge.w + lon_step*(col+1),  // east
-			tile->edge.w + lon_step*(col+0)); // west
+	grits_tile_foreach_index(tile, row, col) {
+		if (!tile->children[row][col])
+			tile->children[row][col] =
+				grits_tile_new(tile, 0, 0, 0, 0);
+		/* Set edges aferwards so that north and south
+		 * get reset for mercator projections */
+		GritsTile *child = tile->children[row][col];
+		child->edge.n = tile->edge.n - lat_step*(row+0);
+		child->edge.s = tile->edge.n - lat_step*(row+1);
+		child->edge.e = tile->edge.w + lon_step*(col+1);
+		child->edge.w = tile->edge.w + lon_step*(col+0);
+	}
 }
 
 static void _grits_tile_split_mercator(GritsTile *tile)
@@ -196,25 +204,29 @@ void grits_tile_update(GritsTile *tile, GritsPoint *eye,
 		gdouble res, gint width, gint height,
 		GritsTileLoadFunc load_func, gpointer user_data)
 {
-	//g_debug("GritsTile: update - %p->atime = %u",
-	//		tile, (guint)tile->atime);
 	GritsTile *child;
 
 	if (tile == NULL)
 		return;
 
-	if (!tile->data)
-		load_func(tile, user_data);
+	//g_debug("GritsTile: update - %p->atime = %u",
+	//		tile, (guint)tile->atime);
 
-	tile->atime = time(NULL);
-
-	/* Is this tile high enough resolution? */
-	if (_grits_tile_precise(eye, &tile->edge, res, width, height)) {
-		grits_tile_foreach(tile, child)
-			if (child)
-				GRITS_OBJECT(child)->hidden = TRUE;
+	/* Is the parent tile's texture high enough
+	 * resolution for this part? */
+	gint xs = G_N_ELEMENTS(tile->children);
+	gint ys = G_N_ELEMENTS(tile->children[0]);
+	if (_grits_tile_precise(eye, &tile->edge, res, width/xs, height/ys)) {
+		GRITS_OBJECT(tile)->hidden = TRUE;
 		return;
 	}
+
+	/* Load the tile */
+	if (!tile->load && !tile->data)
+		load_func(tile, user_data);
+	tile->atime = time(NULL);
+	tile->load  = TRUE;
+	GRITS_OBJECT(tile)->hidden = FALSE;
 
 	/* Split tile if needed */
 	grits_tile_foreach(tile, child) {
@@ -227,12 +239,9 @@ void grits_tile_update(GritsTile *tile, GritsPoint *eye,
 	}
 
 	/* Update recursively */
-	grits_tile_foreach(tile, child) {
-		GRITS_OBJECT(child)->hidden = FALSE;
+	grits_tile_foreach(tile, child)
 		grits_tile_update(child, eye, res, width, height,
 				load_func, user_data);
-	}
-
 }
 
 /**
@@ -303,8 +312,10 @@ GritsTile *grits_tile_gc(GritsTile *root, time_t atime,
 	}
 	//g_debug("GritsTile: gc - %p->atime=%u < atime=%u",
 	//		root, (guint)root->atime, (guint)atime);
-	if (!has_children && root->atime < atime && root->data) {
-		free_func(root, user_data);
+	if (!has_children && root->atime < atime &&
+			(root->data || !root->load)) {
+		if (root->data)
+			free_func(root, user_data);
 		g_object_unref(root);
 		return NULL;
 	}
@@ -459,6 +470,11 @@ static void grits_tile_draw_one(GritsTile *tile, GritsOpenGL *opengl, GList *tri
 /* Draw the tile */
 static gboolean grits_tile_draw_rec(GritsTile *tile, GritsOpenGL *opengl)
 {
+	//g_debug("GritsTile: draw_rec - tile=%p, data=%d, load=%d, hide=%d", tile,
+	//		tile ? !!tile->data : 0,
+	//		tile ? !!tile->load : 0,
+	//		tile ? !!GRITS_OBJECT(tile)->hidden : 0);
+
 	if (!tile || !tile->data || GRITS_OBJECT(tile)->hidden)
 		return FALSE;
 

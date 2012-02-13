@@ -37,6 +37,7 @@ struct _GritsTile {
 
 	/* Pointer to the tile data */
 	gpointer data;
+	gboolean load;
 
 	/* Drawing order */
 	gint zindex;

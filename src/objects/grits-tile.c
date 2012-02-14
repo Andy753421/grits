@@ -64,10 +64,8 @@ GritsTile *grits_tile_new(GritsTile *parent,
 	tile->atime  = time(NULL);
 	grits_bounds_set_bounds(&tile->coords, 0, 1, 1, 0);
 	grits_bounds_set_bounds(&tile->edge, n, s, e, w);
-	if (parent) {
+	if (parent)
 		tile->proj   = parent->proj;
-		tile->zindex = parent->zindex+1;
-	}
 	return tile;
 }
 
@@ -456,31 +454,21 @@ static gboolean grits_tile_draw_rec(GritsTile *tile, GritsOpenGL *opengl)
 		return FALSE;
 
 	GritsTile *child = NULL;
-	gboolean   done  = FALSE;
-	while (!done) {
-		/* Only draw children if possible */
-		gboolean draw_parent = FALSE;
-		grits_tile_foreach(tile, child)
-			if (!child || !child->data || GRITS_OBJECT(child)->hidden)
-				draw_parent = TRUE;
 
-		/* Draw parent tile underneath */
-		if (draw_parent) {
-			GList *triangles = roam_sphere_get_intersect(opengl->sphere, FALSE,
-					tile->edge.n, tile->edge.s, tile->edge.e, tile->edge.w);
-			grits_tile_draw_one(tile, opengl, triangles);
-			g_list_free(triangles);
-		}
+	/* Draw child tiles */
+	gboolean draw_parent = FALSE;
+	grits_tile_foreach(tile, child)
+		if (!grits_tile_draw_rec(child, opengl))
+			draw_parent = TRUE;
 
-		/* Draw child tiles */
-		gboolean drew_all_children = TRUE;
-		grits_tile_foreach(tile, child)
-			if (!grits_tile_draw_rec(child, opengl))
-				drew_all_children = FALSE;
-
-		/* Check if tiles were hidden by a thread while drawing */
-		done = draw_parent || drew_all_children;
+	/* Draw parent tile underneath using depth test */
+	if (draw_parent) {
+		GList *triangles = roam_sphere_get_intersect(opengl->sphere, FALSE,
+				tile->edge.n, tile->edge.s, tile->edge.e, tile->edge.w);
+		grits_tile_draw_one(tile, opengl, triangles);
+		g_list_free(triangles);
 	}
+
 	return TRUE;
 }
 

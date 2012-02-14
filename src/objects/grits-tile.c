@@ -143,6 +143,7 @@ static gboolean _grits_tile_precise(GritsPoint *eye, GritsBounds *bounds,
 
 static void _grits_tile_split_latlon(GritsTile *tile)
 {
+	//g_debug("GritsTile: split - %p", tile);
 	const gdouble rows = G_N_ELEMENTS(tile->children);
 	const gdouble cols = G_N_ELEMENTS(tile->children[0]);
 	const gdouble lat_dist = tile->edge.n - tile->edge.s;
@@ -314,6 +315,7 @@ GritsTile *grits_tile_gc(GritsTile *root, time_t atime,
 	//		root, (guint)root->atime, (guint)atime);
 	if (!has_children && root->atime < atime &&
 			(root->data || !root->load)) {
+		//g_debug("GritsTile: gc/free - %p", root);
 		if (root->data)
 			free_func(root, user_data);
 		g_object_unref(root);
@@ -370,8 +372,6 @@ static void grits_tile_draw_one(GritsTile *tile, GritsOpenGL *opengl, GList *tri
 	if (!triangles)
 		g_warning("GritsOpenGL: _draw_tiles - No triangles to draw: edges=%f,%f,%f,%f",
 			tile->edge.n, tile->edge.s, tile->edge.e, tile->edge.w);
-	if (!grits_tile_mask)
-		grits_tile_mask = _grits_tile_load_mask();
 
 	//g_message("drawing %4d triangles for tile edges=%7.2f,%7.2f,%7.2f,%7.2f",
 	//		g_list_length(triangles), tile->edge.n, tile->edge.s, tile->edge.e, tile->edge.w);
@@ -387,6 +387,8 @@ static void grits_tile_draw_one(GritsTile *tile, GritsOpenGL *opengl, GList *tri
 
 	gdouble xscale = tile->coords.e - tile->coords.w;
 	gdouble yscale = tile->coords.s - tile->coords.n;
+
+	glPolygonOffset(0, -tile->zindex);
 
 	for (GList *cur = triangles; cur; cur = cur->next) {
 		RoamTriangle *tri = cur->data;
@@ -430,40 +432,14 @@ static void grits_tile_draw_one(GritsTile *tile, GritsOpenGL *opengl, GList *tri
 			xy[i][1] = tile->coords.n + xy[i][1]*yscale;
 		}
 
-		/* Polygon offset */
-		glEnable(GL_POLYGON_OFFSET_FILL);
-		glPolygonOffset(0, -tile->zindex);
-
-		/* Setup texture */
-		glActiveTexture(GL_TEXTURE0);
-		glEnable(GL_TEXTURE_2D);
+		/* Draw triangle */
 		glBindTexture(GL_TEXTURE_2D, *(guint*)tile->data);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-
-		/* Enable texture mask */
-		if (tile->proj == GRITS_PROJ_MERCATOR) {
-			glActiveTexture(GL_TEXTURE1);
-			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, grits_tile_mask);
-			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-
-			/* Hack to show maps tiles with better color */
-			float material_emission[] = {0.5, 0.5, 0.5, 1.0};
-			glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, material_emission);
-
-			glEnable(GL_BLEND);
-		}
-
-		/* Draw triangle */
 		glBegin(GL_TRIANGLES);
 		glNormal3dv(tri->p.r->norm); glMultiTexCoord2dv(GL_TEXTURE0, xy[0]); glMultiTexCoord2dv(GL_TEXTURE1, xy[0]); glVertex3dv((double*)tri->p.r);
 		glNormal3dv(tri->p.m->norm); glMultiTexCoord2dv(GL_TEXTURE0, xy[1]); glMultiTexCoord2dv(GL_TEXTURE1, xy[1]); glVertex3dv((double*)tri->p.m);
 		glNormal3dv(tri->p.l->norm); glMultiTexCoord2dv(GL_TEXTURE0, xy[2]); glMultiTexCoord2dv(GL_TEXTURE1, xy[2]); glVertex3dv((double*)tri->p.l);
 		glEnd();
-
-		/* Disable texture mask */
-		glDisable(GL_TEXTURE_2D);
-		glActiveTexture(GL_TEXTURE0);
 	}
 }
 
@@ -513,7 +489,34 @@ static void grits_tile_draw(GritsObject *tile, GritsOpenGL *opengl)
 	glDepthFunc(GL_LESS);
 	glEnable(GL_ALPHA_TEST);
 	glAlphaFunc(GL_GREATER, 0.1);
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glEnable(GL_BLEND);
+
+	/* Setup texture mask */
+	if (!grits_tile_mask)
+		grits_tile_mask = _grits_tile_load_mask();
+	glActiveTexture(GL_TEXTURE1);
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, grits_tile_mask);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+	/* Setup texture */
+	glActiveTexture(GL_TEXTURE0);
+	glEnable(GL_TEXTURE_2D);
+
+	/* Hack to show maps tiles with better color */
+	if (GRITS_TILE(tile)->proj == GRITS_PROJ_MERCATOR) {
+		float material_emission[] = {0.5, 0.5, 0.5, 1.0};
+		glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, material_emission);
+	}
+
+	/* Draw all tiles */
 	grits_tile_draw_rec(GRITS_TILE(tile), opengl);
+
+	/* Disable texture mask */
+	glActiveTexture(GL_TEXTURE1);
+	glDisable(GL_TEXTURE_2D);
+	glActiveTexture(GL_TEXTURE0);
 }
 
 

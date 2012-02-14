@@ -253,7 +253,8 @@ GList *grits_http_available(GritsHttp *http,
 			if (g_regex_match(filter_re, file, 0, NULL))
 				files = g_list_prepend(files, g_strdup(file));
 		g_free(path);
-		g_dir_close(dir);
+		if (dir)
+			g_dir_close(dir);
 	}
 
 	/* Add online files if online */

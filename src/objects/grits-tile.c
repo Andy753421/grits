@@ -217,7 +217,8 @@ void grits_tile_update(GritsTile *tile, GritsPoint *eye,
 	 * resolution for this part? */
 	gint xs = G_N_ELEMENTS(tile->children);
 	gint ys = G_N_ELEMENTS(tile->children[0]);
-	if (_grits_tile_precise(eye, &tile->edge, res, width/xs, height/ys)) {
+	if (tile->parent && _grits_tile_precise(eye, &tile->edge,
+				res, width/xs, height/ys)) {
 		GRITS_OBJECT(tile)->hidden = TRUE;
 		return;
 	}
@@ -311,9 +312,9 @@ GritsTile *grits_tile_gc(GritsTile *root, time_t atime,
 		if (root->children[x][y])
 			has_children = TRUE;
 	}
-	//g_debug("GritsTile: gc - %p->atime=%u < atime=%u",
-	//		root, (guint)root->atime, (guint)atime);
-	if (!has_children && root->atime < atime &&
+	//g_debug("GritsTile: gc - %p kids=%d time=%d data=%d load=%d",
+	//	root, !!has_children, root->atime < atime, !!root->data, !!root->load);
+	if (root->parent && !has_children && root->atime < atime &&
 			(root->data || !root->load)) {
 		//g_debug("GritsTile: gc/free - %p", root);
 		if (root->data)

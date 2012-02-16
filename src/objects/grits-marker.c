@@ -35,6 +35,10 @@
 #include "gtkgl.h"
 #include "grits-marker.h"
 
+#ifdef SYS_WIN
+#include <GL/glext.h>
+#endif
+
 /* Texture setup functions */
 static void render_point(GritsMarker *marker)
 {

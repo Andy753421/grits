@@ -119,6 +119,42 @@ void gtk_gl_disable(GtkWidget *widget)
 #elif defined(SYS_WIN)
 #include <windows.h>
 #include <gdk/gdkwin32.h>
+#include <GL/gl.h>
+
+/* Windows doens't define OpenGL extensions */
+static void APIENTRY (*glMultiTexCoord2dvPtr)(int target, const double *v);
+static void APIENTRY (*glActiveTexturePtr)(int texture);
+
+void APIENTRY glMultiTexCoord2dv(int target, const double *v)
+{
+	glMultiTexCoord2dvPtr(target, v);
+}
+
+void APIENTRY glActiveTexture(int texture)
+{
+	glActiveTexturePtr(texture);
+}
+
+static void init_extensions(void)
+{
+	static gboolean init_done = FALSE;
+	if (init_done)
+		return;
+	init_done = TRUE;
+
+	g_debug("GtkGl: init_extensions");
+	const guchar *exts = NULL;
+	if (!(exts = glGetString(GL_EXTENSIONS)))
+		g_error("GtkGl: Unable to query extensions");
+	if (!(glMultiTexCoord2dvPtr = (void*)wglGetProcAddress("glMultiTexCoord2dvARB")))
+		g_error("GtkGl: Unable to load glMultiTexCoord2dv extension:\n%s", exts);
+	if (!(glActiveTexturePtr    = (void*)wglGetProcAddress("glActiveTextureARB")))
+		g_error("GtkGl: Unable to load glActiveTexture extension\n%s", exts);
+	g_debug("GtkGl: extensions - glMultiTexCoord2dvPtr=%p glActiveTexturePtr=%p",
+			glMultiTexCoord2dvPtr, glActiveTexturePtr);
+}
+
+/* gtkgl implementation */
 static void on_realize(GtkWidget *widget, gpointer _)
 {
 	g_debug("GtkGl: on_realize");
@@ -167,6 +203,7 @@ void gtk_gl_begin(GtkWidget *widget)
 	HGLRC hRC  = g_object_get_data(G_OBJECT(widget), "glcontext");
 	if (!wglMakeCurrent(hDC, hRC))
 		g_error("GtkGl: wglMakeCurrent failed");
+	init_extensions();
 }
 
 void gtk_gl_end(GtkWidget *widget)
@@ -184,7 +221,6 @@ void gtk_gl_disable(GtkWidget *widget)
 	HGLRC hRC = g_object_get_data(G_OBJECT(widget), "glcontext");
 	wglDeleteContext(hRC);
 }
-
 
 
 /**************************

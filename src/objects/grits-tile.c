@@ -37,6 +37,11 @@
 #include "gtkgl.h"
 #include "grits-tile.h"
 
+#ifdef SYS_WIN
+#define GL_GLEXT_PROTOTYPES
+#include <GL/glext.h>
+#endif
+
 guint  grits_tile_mask = 0;
 
 gchar *grits_tile_path_table[2][2] = {

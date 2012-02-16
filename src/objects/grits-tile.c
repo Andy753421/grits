@@ -34,6 +34,7 @@
 
 #include <config.h>
 #include <math.h>
+#include <string.h>
 #include "gtkgl.h"
 #include "grits-tile.h"
 
@@ -352,13 +353,15 @@ void grits_tile_free(GritsTile *root, GritsTileFreeFunc free_func, gpointer user
 /* Load texture mask so we can draw a texture to just a part of a triangle */
 static guint _grits_tile_load_mask(void)
 {
-	guint  tex;
-	guint8 byte = 0xff;
+	guint tex;
+	const int width = 256, height = 256;
+	guint8 *bytes = g_malloc(width*height);
+	memset(bytes, 0xff, width*height);
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 1, 1, 0,
-			GL_ALPHA, GL_UNSIGNED_BYTE, &byte);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0,
+			GL_ALPHA, GL_UNSIGNED_BYTE, bytes);
 
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);

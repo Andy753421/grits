@@ -32,16 +32,12 @@
  * representing the OpenGL texture to use when drawing the tile.
  */
 
+#define GL_GLEXT_PROTOTYPES
 #include <config.h>
 #include <math.h>
 #include <string.h>
 #include "gtkgl.h"
 #include "grits-tile.h"
-
-#ifdef SYS_WIN
-#define GL_GLEXT_PROTOTYPES
-#include <GL/glext.h>
-#endif
 
 guint  grits_tile_mask = 0;
 

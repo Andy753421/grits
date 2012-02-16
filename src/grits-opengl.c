@@ -469,6 +469,8 @@ static void grits_opengl_unproject(GritsViewer *_opengl,
 		gdouble *lat, gdouble *lon, gdouble *elev)
 {
 	GritsOpenGL *opengl = GRITS_OPENGL(_opengl);
+	if (!opengl->sphere->view)
+		return;
 	gdouble x, y, z;
 	if (pz < 0) {
 		gfloat tmp = 0;

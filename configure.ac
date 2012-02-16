@@ -26,7 +26,7 @@ PKG_PROG_PKG_CONFIG
 GTK_DOC_CHECK(1.9)
 
 # Check for required packages
-PKG_CHECK_MODULES(GLIB,  glib-2.0 >= 2.14 gobject-2.0 gthread-2.0)
+PKG_CHECK_MODULES(GLIB,  glib-2.0 >= 2.14 gobject-2.0 gthread-2.0 gmodule-2.0)
 PKG_CHECK_MODULES(CAIRO, cairo)
 PKG_CHECK_MODULES(GTK,   gtk+-2.0 >= 2.16)
 PKG_CHECK_MODULES(SOUP,  libsoup-2.4 >= 2.26)

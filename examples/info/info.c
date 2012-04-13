@@ -33,9 +33,11 @@ int main(int argc, char **argv)
 
 
 	/* Query max size */
-	GLint size;
+	GLint size, bits;
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &size);
+	glGetIntegerv(GL_DEPTH_BITS, &bits);
 	printf("\nGL_MAX_TEXTURE_SIZE = %d\n", size);
+	printf("\nGL_DEPTH_BITS = %d\n", bits);
 
 
 	/* Test extensions */

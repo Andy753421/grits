@@ -27,16 +27,17 @@
 #include <math.h>
 
 #include <grits.h>
+#include <GL/glut.h>
 
 #include "env.h"
 
 /***********
  * Helpers *
  ***********/
-static void expose(GritsCallback *callback, GritsOpenGL *opengl, gpointer _env)
+static void expose_sky(GritsCallback *sky, GritsOpenGL *opengl, gpointer _env)
 {
 	GritsPluginEnv *env = GRITS_PLUGIN_ENV(_env);
-	g_debug("GritsPluginEnv: expose");
+	g_debug("GritsPluginEnv: expose_sky");
 
 	gdouble lat, lon, elev;
 	grits_viewer_get_location(env->viewer, &lat, &lon, &elev);
@@ -75,6 +76,47 @@ static void expose(GritsCallback *callback, GritsOpenGL *opengl, gpointer _env)
 	glEnd();
 }
 
+static void expose_hud(GritsCallback *hud, GritsOpenGL *opengl, gpointer _env)
+{
+	GritsPluginEnv *env = GRITS_PLUGIN_ENV(_env);
+	g_debug("GritsPluginEnv: expose_hud");
+	gdouble x, y, z;
+	grits_viewer_get_rotation(env->viewer, &x, &y, &z);
+
+	/* Setup projection */
+	gint win_width  = GTK_WIDGET(opengl)->allocation.width;
+	gint win_height = GTK_WIDGET(opengl)->allocation.height;
+	float scale     = MIN(win_width, win_height) / 10.0;
+	float offset    = scale+20;
+	glTranslatef(offset, offset, 0);
+
+	/* Setup lighting */
+	float light_ambient[]  = {0.1f, 0.1f, 0.0f, 1.0f};
+	float light_diffuse[]  = {0.9f, 0.9f, 0.9f, 1.0f};
+	float light_position[] = {-50.0f, -40.0f, -80.0f, 1.0f};
+	glLightfv(GL_LIGHT0, GL_AMBIENT,  light_ambient);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE,  light_diffuse);
+	glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+
+	/* Setup state */
+	glClear(GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_COLOR_MATERIAL);
+	glEnable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+
+	/* Draw compas */
+	glRotatef(x, 1, 0, 0);
+	glRotatef(-z, 0, 0, 1);
+	glRotatef(-90, 0, 0, 1);
+	glRotatef(-90, 1, 0, 0);
+	glColor4f(0.9, 0.9, 0.7, 1.0);
+	glutSolidTeapot(scale * 0.5);
+}
+
+static void click_hud(GritsCallback *hud, GritsViewer *viewer)
+{
+	grits_viewer_set_rotation(viewer, 0, 0, 0);
+}
 
 /***********
  * Methods *
@@ -95,9 +137,13 @@ GritsPluginEnv *grits_plugin_env_new(GritsViewer *viewer, GritsPrefs *prefs)
 	env->viewer = g_object_ref(viewer);
 
 	/* Add sky */
-	GritsCallback *callback = grits_callback_new(expose, env);
-	grits_viewer_add(viewer, GRITS_OBJECT(callback), GRITS_LEVEL_BACKGROUND, FALSE);
-	env->refs = g_list_prepend(env->refs, callback);
+	GritsCallback *sky = grits_callback_new(expose_sky, env);
+	GritsCallback *hud = grits_callback_new(expose_hud, env);
+	grits_viewer_add(viewer, GRITS_OBJECT(sky), GRITS_LEVEL_BACKGROUND, FALSE);
+	grits_viewer_add(viewer, GRITS_OBJECT(hud), GRITS_LEVEL_HUD, FALSE);
+	g_signal_connect(hud, "clicked", G_CALLBACK(click_hud), viewer);
+	env->refs = g_list_prepend(env->refs, sky);
+	env->refs = g_list_prepend(env->refs, hud);
 
 	/* Add background */
 	//GritsTile *background = grits_tile_new(NULL, NORTH, SOUTH, EAST, WEST);
@@ -147,6 +193,8 @@ static void grits_plugin_env_dispose(GObject *gobject)
 static void grits_plugin_env_class_init(GritsPluginEnvClass *klass)
 {
 	g_debug("GritsPluginEnv: class_init");
+	int argc = 1; char *argv[] = {"", NULL};
+	glutInit(&argc, argv);
 	GObjectClass *gobject_class = (GObjectClass*)klass;
 	gobject_class->dispose = grits_plugin_env_dispose;
 }

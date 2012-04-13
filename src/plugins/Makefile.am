@@ -20,6 +20,7 @@ elev_la_SOURCES     = elev.c elev.h
 map_la_SOURCES      = map.c  map.h
 env_la_SOURCES      = env.c  env.h
 test_la_SOURCES     = test.c test.h
+env_la_LDFLAGS      = $(AM_LDFLAGS) -lglut
 
 if HAVE_GLUT
 noinst_LTLIBRARIES  = teapot.la

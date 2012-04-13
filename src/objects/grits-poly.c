@@ -64,7 +64,6 @@ static void grits_poly_outline(gdouble (**points)[3])
 static gboolean grits_poly_runlist(GritsPoly *poly, int i,
 		void (*render)(gdouble(**)[3]))
 {
-	//g_debug("GritsPoly: genlist");
 	if (poly->list[i]) {
 		glCallList(poly->list[i]);
 	} else {
@@ -73,6 +72,7 @@ static gboolean grits_poly_runlist(GritsPoly *poly, int i,
 		render(poly->points);
 		glEndList();
 		poly->list[i] = list;
+		//g_debug("GritsPoly: genlist");
 	}
 	return FALSE;
 }

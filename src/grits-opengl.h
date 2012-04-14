@@ -47,6 +47,7 @@ struct _GritsOpenGL {
 
 	/* for testing */
 	gboolean    wireframe;
+	gboolean    pickmode;
 };
 
 struct _GritsOpenGLClass {

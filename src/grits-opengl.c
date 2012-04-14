@@ -139,33 +139,43 @@ static void _set_visuals(GritsOpenGL *opengl)
 	g_mutex_unlock(opengl->sphere_lock);
 }
 
+typedef void (*GritsLevelFunc)(GritsObject *obj, gpointer user_data, gint level, gboolean sorted);
+
 static gboolean _foreach_object_cb(gpointer key, gpointer value, gpointer pointers)
 {
 	struct RenderLevel *level = value;
-	GFunc    user_func = ((gpointer*)pointers)[0];
-	gpointer user_data = ((gpointer*)pointers)[1];
+	GritsLevelFunc user_func = ((gpointer*)pointers)[0];
+	gpointer       user_data = ((gpointer*)pointers)[1];
 	for (GList *cur = level->unsorted.next; cur; cur = cur->next)
-		user_func(cur->data, user_data);
+		user_func(cur->data, user_data, (gint)key, FALSE);
 	for (GList *cur = level->sorted.next;   cur; cur = cur->next)
-		user_func(cur->data, user_data);
+		user_func(cur->data, user_data, (gint)key, TRUE);
 	return FALSE;
 }
 
-static void _foreach_object(GritsOpenGL *opengl, GFunc func, gpointer user_data)
+static void _foreach_object(GritsOpenGL *opengl, GritsLevelFunc func, gpointer user_data)
 {
 	gpointer pointers[2] = {func, user_data};
 	g_tree_foreach(opengl->objects, _foreach_object_cb, pointers);
 }
 
-static void _add_object(GritsObject *object, GPtrArray *array)
+static void _add_object_world(GritsObject *object, GPtrArray *array, gint level, gboolean sorted)
 {
-	g_ptr_array_add(array, object);
+	if (level < GRITS_LEVEL_HUD)
+		g_ptr_array_add(array, object);
 }
 
-static GPtrArray *_objects_to_array(GritsOpenGL *opengl)
+static void _add_object_ortho(GritsObject *object, GPtrArray *array, gint level, gboolean sorted)
+{
+	if (level >= GRITS_LEVEL_HUD)
+		g_ptr_array_add(array, object);
+}
+
+static GPtrArray *_objects_to_array(GritsOpenGL *opengl, gboolean ortho)
 {
 	GPtrArray *array = g_ptr_array_new();
-	_foreach_object(opengl, (GFunc)_add_object, array);
+	GritsLevelFunc func = (GritsLevelFunc)(ortho ? _add_object_ortho : _add_object_world);
+	_foreach_object(opengl, func, array);
 	return array;
 }
 
@@ -182,6 +192,109 @@ static gboolean on_configure(GritsOpenGL *opengl, GdkEventConfigure *event, gpoi
 	roam_sphere_update_errors(opengl->sphere);
 	g_mutex_unlock(opengl->sphere_lock);
 #endif
+
+	return FALSE;
+}
+
+static gint run_picking(GritsOpenGL *opengl, GPtrArray *objects)
+{
+	/* Setup picking buffers */
+	guint buffer[100][4] = {};
+	glSelectBuffer(G_N_ELEMENTS(buffer), (guint*)buffer);
+	if (!opengl->pickmode)
+		glRenderMode(GL_SELECT);
+	glInitNames();
+
+	/* Render/pick objects */
+	for (guint i = 0; i < objects->len; i++) {
+		glPushName(i);
+		GritsObject *object = objects->pdata[i];
+		object->state.picked = FALSE;
+		grits_object_pick(object, opengl);
+		glPopName();
+	}
+
+	int hits = glRenderMode(GL_RENDER);
+
+	/* Process hits */
+	for (int i = 0; i < hits; i++) {
+		//g_debug("\tHit: %d",     i);
+		//g_debug("\t\tcount: %d", buffer[i][0]);
+		//g_debug("\t\tz1:    %f", (float)buffer[i][1]/0x7fffffff);
+		//g_debug("\t\tz2:    %f", (float)buffer[i][2]/0x7fffffff);
+		//g_debug("\t\tname:  %p", (gpointer)buffer[i][3]);
+		guint        index  = buffer[i][3];
+		GritsObject *object = objects->pdata[index];
+		object->state.picked = TRUE;
+	}
+
+	/* Notify objects of pointer movements */
+	for (guint i = 0; i < objects->len; i++) {
+		GritsObject *object = objects->pdata[i];
+		grits_object_set_pointer(object, object->state.picked);
+	}
+
+	return hits;
+}
+
+static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpointer _)
+{
+	gdouble height = GTK_WIDGET(opengl)->allocation.height;
+	gdouble gl_x   = event->x;
+	gdouble gl_y   = height - event->y;
+	gdouble delta  = opengl->pickmode ? 200 : 2;
+
+	if (opengl->pickmode) {
+		gtk_gl_begin(GTK_WIDGET(opengl));
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	}
+
+	/* Save matricies */
+	gdouble projection[16];
+	gint    viewport[4]; // x=0,y=0,w,h
+	glGetDoublev(GL_PROJECTION_MATRIX, projection);
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	glMatrixMode(GL_MODELVIEW);  glPushMatrix();
+	glMatrixMode(GL_PROJECTION); glPushMatrix();
+
+	g_mutex_lock(opengl->objects_lock);
+
+	GPtrArray *ortho = _objects_to_array(opengl, TRUE);
+	GPtrArray *world = _objects_to_array(opengl, FALSE);
+
+	/* Run perspective picking */
+	glMatrixMode(GL_PROJECTION); glLoadIdentity();
+	gluPickMatrix(gl_x, gl_y, delta, delta, viewport);
+	glMultMatrixd(projection);
+	gint world_hits = run_picking(opengl, world);
+
+	/* Run ortho picking */
+	glMatrixMode(GL_PROJECTION); glLoadIdentity();
+	gluPickMatrix(gl_x, gl_y, delta, delta, viewport);
+	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
+	glOrtho(0, viewport[2], viewport[3], 0, 1000, -1000);
+	gint ortho_hits = run_picking(opengl, ortho);
+
+	g_debug("GritsOpenGL: on_motion_notify - hits=%d/%d,%d/%d ev=%.0lf,%.0lf",
+			world_hits, world->len, ortho_hits, ortho->len, gl_x, gl_y);
+
+	g_ptr_array_free(world, TRUE);
+	g_ptr_array_free(ortho, TRUE);
+
+	g_mutex_unlock(opengl->objects_lock);
+
+
+	/* Test unproject */
+	//gdouble lat, lon, elev;
+	//grits_viewer_unproject(GRITS_VIEWER(opengl),
+	//		gl_x, gl_y, -1, &lat, &lon, &elev);
+
+	/* Cleanup */
+	glMatrixMode(GL_PROJECTION); glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);  glPopMatrix();
+
+	if (opengl->pickmode)
+		gtk_gl_end(GTK_WIDGET(opengl));
 
 	return FALSE;
 }
@@ -212,6 +325,15 @@ static gboolean _draw_level(gpointer key, gpointer value, gpointer user_data)
 		//glDepthMask(FALSE);
 	}
 
+	/* Start ortho */
+	if (lnum >= GRITS_LEVEL_HUD) {
+		glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+		glMatrixMode(GL_MODELVIEW);  glPushMatrix(); glLoadIdentity();
+		gint win_width  = GTK_WIDGET(opengl)->allocation.width;
+		gint win_height = GTK_WIDGET(opengl)->allocation.height;
+		glOrtho(0, win_width, win_height, 0, 1000, -1000);
+	}
+
 	/* Draw unsorted objects without depth testing,
 	 * these are polygons, etc, rather than physical objects */
 	glDisable(GL_DEPTH_TEST);
@@ -224,6 +346,12 @@ static gboolean _draw_level(gpointer key, gpointer value, gpointer user_data)
 	for (cur = level->sorted.next; cur; cur = cur->next, nsorted++)
 		grits_object_draw(GRITS_OBJECT(cur->data), opengl);
 
+	/* End ortho */
+	if (lnum >= GRITS_LEVEL_HUD) {
+		glMatrixMode(GL_PROJECTION); glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);  glPopMatrix();
+	}
+
 	/* TODO: Prune empty levels */
 
 	g_debug("GritsOpenGL: _draw_level - drew %d,%d objects",
@@ -234,6 +362,9 @@ static gboolean _draw_level(gpointer key, gpointer value, gpointer user_data)
 static gboolean on_expose(GritsOpenGL *opengl, GdkEventExpose *event, gpointer _)
 {
 	g_debug("GritsOpenGL: on_expose - begin");
+
+	if (opengl->pickmode)
+		return on_motion_notify(opengl, (GdkEventMotion*)event, NULL);
 
 	gtk_gl_begin(GTK_WIDGET(opengl));
 
@@ -262,72 +393,6 @@ static gboolean on_expose(GritsOpenGL *opengl, GdkEventExpose *event, gpointer _
 	return FALSE;
 }
 
-static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpointer _)
-{
-	gdouble height = GTK_WIDGET(opengl)->allocation.height;
-	gdouble gl_x   = event->x;
-	gdouble gl_y   = height - event->y;
-
-	/* Configure view */
-	gint viewport[4];
-	gdouble projection[16];
-	glGetIntegerv(GL_VIEWPORT, viewport);
-	glGetDoublev(GL_PROJECTION_MATRIX, projection);
-
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
-	glLoadIdentity();
-	gluPickMatrix(gl_x, gl_y, 2, 2, viewport);
-	glMultMatrixd(projection);
-
-	/* Prepare for picking */
-	guint buffer[100][4] = {};
-	glSelectBuffer(G_N_ELEMENTS(buffer), (guint*)buffer);
-	glRenderMode(GL_SELECT);
-	glInitNames();
-
-	/* Run picking */
-	g_mutex_lock(opengl->objects_lock);
-	GPtrArray *objects = _objects_to_array(opengl);
-	for (guint i = 0; i < objects->len; i++) {
-		glPushName(i);
-		GritsObject *object = objects->pdata[i];
-		object->state.picked = FALSE;
-		grits_object_pick(object, opengl);
-		glPopName();
-	}
-	int hits = glRenderMode(GL_RENDER);
-	g_debug("GritsOpenGL: on_motion_notify - hits=%d ev=%.0lf,%.0lf",
-			hits, gl_x, gl_y);
-	for (int i = 0; i < hits; i++) {
-		//g_debug("\tHit: %d",     i);
-		//g_debug("\t\tcount: %d", buffer[i][0]);
-		//g_debug("\t\tz1:    %f", (float)buffer[i][1]/0x7fffffff);
-		//g_debug("\t\tz2:    %f", (float)buffer[i][2]/0x7fffffff);
-		//g_debug("\t\tname:  %p", (gpointer)buffer[i][3]);
-		guint        index  = buffer[i][3];
-		GritsObject *object = objects->pdata[index];
-		object->state.picked = TRUE;
-	}
-	for (guint i = 0; i < objects->len; i++) {
-		GritsObject *object = objects->pdata[i];
-		grits_object_set_pointer(object, object->state.picked);
-	}
-	g_ptr_array_free(objects, TRUE);
-	g_mutex_unlock(opengl->objects_lock);
-
-	/* Test unproject */
-	gdouble lat, lon, elev;
-	grits_viewer_unproject(GRITS_VIEWER(opengl),
-			gl_x, gl_y, -1, &lat, &lon, &elev);
-
-	/* Cleanup */
-	glMatrixMode(GL_PROJECTION);
-	glPopMatrix();
-
-	return FALSE;
-}
-
 static gboolean on_key_press(GritsOpenGL *opengl, GdkEventKey *event, gpointer _)
 {
 	g_debug("GritsOpenGL: on_key_press - key=%x, state=%x, plus=%x",
@@ -337,6 +402,10 @@ static gboolean on_key_press(GritsOpenGL *opengl, GdkEventKey *event, gpointer _
 	/* Testing */
 	if (kv == GDK_w) {
 		opengl->wireframe = !opengl->wireframe;
+		gtk_widget_queue_draw(GTK_WIDGET(opengl));
+	}
+	if (kv == GDK_p) {
+		opengl->pickmode = !opengl->pickmode;
 		gtk_widget_queue_draw(GTK_WIDGET(opengl));
 	}
 #ifdef ROAM_DEBUG
@@ -351,7 +420,7 @@ static gboolean on_key_press(GritsOpenGL *opengl, GdkEventKey *event, gpointer _
 
 static gboolean on_chained_event(GritsOpenGL *opengl, GdkEvent *event, gpointer _)
 {
-	_foreach_object(opengl, (GFunc)grits_object_event, event);
+	_foreach_object(opengl, (GritsLevelFunc)grits_object_event, event);
 	return FALSE;
 }
 

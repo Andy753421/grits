@@ -129,6 +129,8 @@ GritsMarker *grits_marker_new(const gchar *label)
 {
 	GritsMarker *marker = g_object_new(GRITS_TYPE_MARKER, NULL);
 
+	GRITS_OBJECT(marker)->skip = GRITS_SKIP_CENTER;
+
 	marker->display_mask = GRITS_MARKER_DMASK_POINT |
 	                       GRITS_MARKER_DMASK_LABEL;
 
@@ -250,14 +252,10 @@ static void grits_marker_draw(GritsObject *_marker, GritsOpenGL *opengl)
 				point->lat, point->lon, point->elev,
 				&px, &py, &pz);
 
-		gint win_width  = GTK_WIDGET(opengl)->allocation.width;
 		gint win_height = GTK_WIDGET(opengl)->allocation.height;
 		if (pz > 1)
 			return;
 
-		glMatrixMode(GL_PROJECTION); glLoadIdentity();
-		glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
-		glOrtho(0, win_width, win_height, 0, 1, -1);
 		glTranslated(px, win_height-py, 0);
 		glRotatef(marker->angle, 0, 0, -1);
 		glTranslated(-marker->xoff, -marker->yoff, 0);

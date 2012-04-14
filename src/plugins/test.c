@@ -77,7 +77,7 @@ static void on_marker_enter(GritsMarker *marker, GritsViewer *viewer)
 {
 	g_debug("GritsPluginTest: on_marker_enter");
 	GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(viewer));
-	GdkCursor *cursor = gdk_cursor_new(GDK_HAND1);
+	GdkCursor *cursor = gdk_cursor_new(GDK_HAND2);
 	gdk_window_set_cursor(window, cursor);
 }
 
@@ -106,14 +106,10 @@ void _load_marker(GritsPluginTest *test)
 	GRITS_OBJECT(test->marker)->center.lon  = -90.491982;
 	GRITS_OBJECT(test->marker)->center.elev =   0.0;
 	GRITS_OBJECT(test->marker)->lod         = EARTH_R*3;
-	grits_viewer_add(test->viewer, GRITS_OBJECT(test->marker), GRITS_LEVEL_OVERLAY, FALSE);
-	/* These do not work on marker yet */
-	//g_signal_connect(test->marker, "enter",        G_CALLBACK(on_marker_enter),  NULL);
-	//g_signal_connect(test->marker, "leave",        G_CALLBACK(on_marker_leave),  NULL);
-	//g_signal_connect(test->marker, "button-press", G_CALLBACK(on_marker_button), NULL);
-	(void)on_marker_enter;
-	(void)on_marker_leave;
-	(void)on_marker_button;
+	grits_viewer_add(test->viewer, GRITS_OBJECT(test->marker), GRITS_LEVEL_HUD, FALSE);
+	g_signal_connect(test->marker, "enter",   G_CALLBACK(on_marker_enter),  test->viewer);
+	g_signal_connect(test->marker, "leave",   G_CALLBACK(on_marker_leave),  test->viewer);
+	g_signal_connect(test->marker, "clicked", G_CALLBACK(on_marker_button), test->viewer);
 }
 
 void _load_poly(GritsPluginTest *test)
@@ -126,10 +122,10 @@ void _load_poly(GritsPluginTest *test)
 	test->poly->border[3] = 1;
 	test->poly->width     = 6;
 	grits_viewer_add(test->viewer, GRITS_OBJECT(test->poly),  GRITS_LEVEL_OVERLAY, FALSE);
-	g_signal_connect(test->poly, "enter",        G_CALLBACK(on_poly_enter),  NULL);
-	g_signal_connect(test->poly, "leave",        G_CALLBACK(on_poly_leave),  NULL);
-	g_signal_connect(test->poly, "button-press", G_CALLBACK(on_poly_button), NULL);
-	g_signal_connect(test->poly, "key-press",    G_CALLBACK(on_poly_key),    NULL);
+	g_signal_connect(test->poly, "enter",     G_CALLBACK(on_poly_enter),  NULL);
+	g_signal_connect(test->poly, "leave",     G_CALLBACK(on_poly_leave),  NULL);
+	g_signal_connect(test->poly, "clicked",   G_CALLBACK(on_poly_button), NULL);
+	g_signal_connect(test->poly, "key-press", G_CALLBACK(on_poly_key),    NULL);
 }
 
 void _load_line(GritsPluginTest *test)

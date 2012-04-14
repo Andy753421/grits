@@ -95,7 +95,7 @@ int main(int argc, char **argv)
 	load_plugin(plugins, "map",   viewer, prefs, GTK_NOTEBOOK(config));
 	//load_plugin(plugins, "alert", viewer, prefs, GTK_NOTEBOOK(config));
 	//load_plugin(plugins, "radar", viewer, prefs, GTK_NOTEBOOK(config));
-	//load_plugin(plugins, "test",  viewer, prefs, GTK_NOTEBOOK(config));
+	load_plugin(plugins, "test",  viewer, prefs, GTK_NOTEBOOK(config));
 
 	gtk_widget_show_all(config);
 	gtk_main();

@@ -30,21 +30,23 @@
 
 #include "test.h"
 
-static void on_poly_enter(GritsPoly *poly)
+static gboolean on_poly_enter(GritsPoly *poly)
 {
 	g_debug("GritsPluginTest: on_poly_enter");
 	poly->color[3] = 0.50;
 	grits_object_queue_draw(GRITS_OBJECT(poly));
+	return FALSE;
 }
 
-static void on_poly_leave(GritsPoly *poly)
+static gboolean on_poly_leave(GritsPoly *poly)
 {
 	g_debug("GritsPluginTest: on_poly_leave");
 	poly->color[3] = 0.2;
 	grits_object_queue_draw(GRITS_OBJECT(poly));
+	return FALSE;
 }
 
-static void on_poly_button(GritsPoly *poly, GdkEventButton *event)
+static gboolean on_poly_button(GritsPoly *poly, GdkEventButton *event)
 {
 	g_debug("GritsPluginTest: on_poly_button");
 	static int i = 0;
@@ -56,9 +58,10 @@ static void on_poly_button(GritsPoly *poly, GdkEventButton *event)
 	int idx = i++ % G_N_ELEMENTS(colors);
 	memcpy(poly->color, colors[idx], sizeof(gdouble)*3);
 	grits_object_queue_draw(GRITS_OBJECT(poly));
+	return TRUE;
 }
 
-static void on_poly_key(GritsPoly *poly, GdkEventKey *event)
+static gboolean on_poly_key(GritsPoly *poly, GdkEventKey *event)
 {
 	g_debug("GritsPluginTest: on_poly_key - %d", event->keyval);
 	gdouble colors[0xff][3] = {
@@ -67,33 +70,37 @@ static void on_poly_key(GritsPoly *poly, GdkEventKey *event)
 		[GDK_b] {0, 0, 1},
 	};
 	if (event->keyval >= G_N_ELEMENTS(colors))
-		return;
+		return FALSE;
 	int key = event->keyval;
 	memcpy(poly->color, colors[key], sizeof(gdouble)*3);
 	grits_object_queue_draw(GRITS_OBJECT(poly));
+	return TRUE;
 }
 
-static void on_marker_enter(GritsMarker *marker, GritsViewer *viewer)
+static gboolean on_marker_enter(GritsMarker *marker, GdkEvent *event, GritsViewer *viewer)
 {
 	g_debug("GritsPluginTest: on_marker_enter");
 	GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(viewer));
 	GdkCursor *cursor = gdk_cursor_new(GDK_HAND2);
 	gdk_window_set_cursor(window, cursor);
+	return FALSE;
 }
 
-static void on_marker_leave(GritsMarker *marker, GritsViewer *viewer)
+static gboolean on_marker_leave(GritsMarker *marker, GdkEvent *event, GritsViewer *viewer)
 {
 	g_debug("GritsPluginTest: on_marker_leave");
 	GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(viewer));
 	gdk_window_set_cursor(window, NULL);
+	return FALSE;
 }
 
-static void on_marker_button(GritsMarker *marker, GdkEventButton *event)
+static gboolean on_marker_button(GritsMarker *marker, GdkEventButton *event)
 {
 	g_debug("GritsPluginTest: on_marker_button");
 	GtkWidget *dialog = gtk_dialog_new_with_buttons(
 			"St. Charles!", NULL, 0, GTK_STOCK_OK, GTK_RESPONSE_OK, NULL);
 	gtk_dialog_run(GTK_DIALOG(dialog));
+	return TRUE;
 }
 
 /***********

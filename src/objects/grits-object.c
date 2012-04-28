@@ -33,6 +33,7 @@
 
 #include "gtkgl.h"
 #include "grits-object.h"
+#include "grits-marshal.h"
 
 /* Constants */
 enum {
@@ -171,20 +172,22 @@ void grits_object_pick(GritsObject *object, GritsOpenGL *opengl)
 	grits_object_pickdraw(object, opengl, TRUE);
 }
 
-void grits_object_set_pointer(GritsObject *object, gboolean selected)
+gboolean grits_object_set_pointer(GritsObject *object, GdkEvent *event, gboolean selected)
 {
+	gboolean rval = FALSE;
 	if (selected) {
 		if (!object->state.selected)
-			g_signal_emit(object, signals[SIG_ENTER], 0);
+			g_signal_emit(object, signals[SIG_ENTER], 0, event, &rval);
 		object->state.selected = TRUE;
 	} else {
 		if (object->state.selected)
-			g_signal_emit(object, signals[SIG_LEAVE], 0);
+			g_signal_emit(object, signals[SIG_LEAVE], 0, event, &rval);
 		object->state.selected = FALSE;
 	}
+	return rval;
 }
 
-void grits_object_event(GritsObject *object, GdkEvent *event)
+gboolean grits_object_event(GritsObject *object, GdkEvent *event)
 {
 	const int map[GDK_EVENT_LAST] = {
 		[GDK_BUTTON_PRESS  ] SIG_BUTTON_PRESS,
@@ -196,21 +199,28 @@ void grits_object_event(GritsObject *object, GdkEvent *event)
 		[GDK_MOTION_NOTIFY ] SIG_MOTION,
 	};
 	if (!object->state.selected)
-		return;
+		return FALSE;
 	guint sig = map[event->type];
+	gboolean rval = FALSE;
 
 	/* Handle button click */
 	if (sig == SIG_BUTTON_PRESS)
 		object->state.clicking = TRUE;
 	if (sig == SIG_BUTTON_RELEASE && object->state.clicking)
-		g_signal_emit(object, signals[SIG_CLICKED], 0, event);
+		g_signal_emit(object, signals[SIG_CLICKED], 0, event, &rval);
 	if (sig == SIG_BUTTON_RELEASE || sig == SIG_MOTION)
 		object->state.clicking = FALSE;
 
 	/* Emit this signal */
-	if (!g_signal_has_handler_pending(object, signals[sig], 0, FALSE))
-		return;
-	g_signal_emit(object, signals[sig], 0, event);
+	if (rval == FALSE) {
+		if (!g_signal_has_handler_pending(object, signals[sig], 0, FALSE))
+			return FALSE;
+		g_signal_emit(object, signals[sig], 0, event, &rval);
+	}
+
+	if (rval == TRUE)
+		g_debug("GritsObject: breaking chained event");
+	return rval;
 }
 
 /* GObject stuff */
@@ -239,9 +249,10 @@ static void grits_object_class_init(GritsObjectClass *klass)
 			0,
 			NULL,
 			NULL,
-			g_cclosure_marshal_VOID__VOID,
-			G_TYPE_NONE,
-			0);
+			grits_cclosure_marshal_BOOLEAN__POINTER,
+			G_TYPE_BOOLEAN,
+			1,
+			G_TYPE_POINTER);
 
 	/**
 	 * GritsViewer::leave:
@@ -257,9 +268,10 @@ static void grits_object_class_init(GritsObjectClass *klass)
 			0,
 			NULL,
 			NULL,
-			g_cclosure_marshal_VOID__VOID,
-			G_TYPE_NONE,
-			0);
+			grits_cclosure_marshal_BOOLEAN__POINTER,
+			G_TYPE_BOOLEAN,
+			1,
+			G_TYPE_POINTER);
 
 	/**
 	 * GritsViewer::clicked:
@@ -274,9 +286,10 @@ static void grits_object_class_init(GritsObjectClass *klass)
 			0,
 			NULL,
 			NULL,
-			g_cclosure_marshal_VOID__VOID,
-			G_TYPE_NONE,
-			0);
+			grits_cclosure_marshal_BOOLEAN__POINTER,
+			G_TYPE_BOOLEAN,
+			1,
+			G_TYPE_POINTER);
 
 	/**
 	 * GritsViewer::button-press:
@@ -293,8 +306,8 @@ static void grits_object_class_init(GritsObjectClass *klass)
 			0,
 			NULL,
 			NULL,
-			g_cclosure_marshal_VOID__POINTER,
-			G_TYPE_NONE,
+			grits_cclosure_marshal_BOOLEAN__POINTER,
+			G_TYPE_BOOLEAN,
 			1,
 			G_TYPE_POINTER);
 
@@ -313,8 +326,8 @@ static void grits_object_class_init(GritsObjectClass *klass)
 			0,
 			NULL,
 			NULL,
-			g_cclosure_marshal_VOID__POINTER,
-			G_TYPE_NONE,
+			grits_cclosure_marshal_BOOLEAN__POINTER,
+			G_TYPE_BOOLEAN,
 			1,
 			G_TYPE_POINTER);
 
@@ -332,8 +345,8 @@ static void grits_object_class_init(GritsObjectClass *klass)
 			0,
 			NULL,
 			NULL,
-			g_cclosure_marshal_VOID__POINTER,
-			G_TYPE_NONE,
+			grits_cclosure_marshal_BOOLEAN__POINTER,
+			G_TYPE_BOOLEAN,
 			1,
 			G_TYPE_POINTER);
 
@@ -351,8 +364,8 @@ static void grits_object_class_init(GritsObjectClass *klass)
 			0,
 			NULL,
 			NULL,
-			g_cclosure_marshal_VOID__POINTER,
-			G_TYPE_NONE,
+			grits_cclosure_marshal_BOOLEAN__POINTER,
+			G_TYPE_BOOLEAN,
 			1,
 			G_TYPE_POINTER);
 
@@ -370,8 +383,8 @@ static void grits_object_class_init(GritsObjectClass *klass)
 			0,
 			NULL,
 			NULL,
-			g_cclosure_marshal_VOID__POINTER,
-			G_TYPE_NONE,
+			grits_cclosure_marshal_BOOLEAN__POINTER,
+			G_TYPE_BOOLEAN,
 			1,
 			G_TYPE_POINTER);
 }

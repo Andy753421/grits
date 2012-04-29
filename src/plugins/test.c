@@ -77,23 +77,6 @@ static gboolean on_poly_key(GritsPoly *poly, GdkEventKey *event)
 	return TRUE;
 }
 
-static gboolean on_marker_enter(GritsMarker *marker, GdkEvent *event, GritsViewer *viewer)
-{
-	g_debug("GritsPluginTest: on_marker_enter");
-	GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(viewer));
-	GdkCursor *cursor = gdk_cursor_new(GDK_HAND2);
-	gdk_window_set_cursor(window, cursor);
-	return FALSE;
-}
-
-static gboolean on_marker_leave(GritsMarker *marker, GdkEvent *event, GritsViewer *viewer)
-{
-	g_debug("GritsPluginTest: on_marker_leave");
-	GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(viewer));
-	gdk_window_set_cursor(window, NULL);
-	return FALSE;
-}
-
 static gboolean on_marker_button(GritsMarker *marker, GdkEventButton *event)
 {
 	g_debug("GritsPluginTest: on_marker_button");
@@ -113,9 +96,8 @@ void _load_marker(GritsPluginTest *test)
 	GRITS_OBJECT(test->marker)->center.lon  = -90.491982;
 	GRITS_OBJECT(test->marker)->center.elev =   0.0;
 	GRITS_OBJECT(test->marker)->lod         = EARTH_R*3;
+	grits_object_set_cursor(GRITS_OBJECT(test->marker), GDK_HAND2);
 	grits_viewer_add(test->viewer, GRITS_OBJECT(test->marker), GRITS_LEVEL_HUD, FALSE);
-	g_signal_connect(test->marker, "enter",   G_CALLBACK(on_marker_enter),  test->viewer);
-	g_signal_connect(test->marker, "leave",   G_CALLBACK(on_marker_leave),  test->viewer);
 	g_signal_connect(test->marker, "clicked", G_CALLBACK(on_marker_button), test->viewer);
 }
 

@@ -223,6 +223,84 @@ static gboolean compass_click(GritsCallback *compass, GdkEvent *evnet, GritsView
 	return TRUE;
 }
 
+/* Info */
+static void info_expose(GritsCallback *compass, GritsOpenGL *opengl, gpointer _env)
+{
+	gint win_width  = GTK_WIDGET(opengl)->allocation.width;
+	gint win_height = GTK_WIDGET(opengl)->allocation.height;
+
+	/* Create cairo  surface */
+	guint            tex     = 0;
+	const gchar     *label0  = "Location: %7.3lf°, %8.3lf°, %4.0fm";
+	const gchar     *label1  = "Cursor:   %7.3lf°, %8.3lf°, %4.0fm";
+	gdouble          width   = 300;
+	gdouble          height  = 200;
+	cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
+	cairo_t         *cairo   = cairo_create(surface);
+
+	/* Text */
+	gdouble lat, lon, elev;
+	grits_viewer_get_location(GRITS_VIEWER(opengl), &lat, &lon, &elev);
+	gchar *text0 = g_strdup_printf(label0, lat, lon, elev);
+	gchar *text1 = g_strdup_printf(label1, lat, lon, elev);
+
+	/* Draw outline */
+	cairo_set_line_width(cairo, 3);
+	cairo_set_source_rgba(cairo, 0, 0, 0, 0.75);
+	cairo_move_to(cairo, 2, 20); cairo_text_path(cairo, text0);
+	cairo_move_to(cairo, 2, 40); cairo_text_path(cairo, text1);
+	cairo_stroke(cairo);
+
+	/* Draw filler */
+	cairo_set_source_rgba(cairo, 1, 1, 1, 1);
+	cairo_move_to(cairo, 2, 20); cairo_show_text(cairo, text0);
+	cairo_move_to(cairo, 2, 40); cairo_show_text(cairo, text1);
+
+	/* Setup pango */
+	PangoLayout          *layout = pango_cairo_create_layout(cairo);
+	PangoFontDescription *font   = pango_font_description_from_string("Mono 9");
+	pango_layout_set_font_description(layout, font);
+	pango_font_description_free(font);
+	pango_layout_set_text(layout, text0, -1);
+	pango_cairo_update_layout(cairo, layout);
+	cairo_set_line_join(cairo, CAIRO_LINE_JOIN_ROUND);
+	cairo_move_to(cairo, 2, 40);
+	pango_cairo_layout_path(cairo, layout);
+	for (float w = 0.2; w <= 0.8; w+=0.2) {
+		cairo_set_line_width(cairo, (1-w)*8);
+		cairo_set_source_rgba(cairo, 0, 0, 0, w);
+		cairo_stroke_preserve(cairo);
+	}
+	cairo_set_source_rgba(cairo, 1, 1, 1, 1);
+	pango_cairo_show_layout(cairo, layout);
+
+	/* Load GL texture */
+	glEnable(GL_TEXTURE_2D);
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height,
+	        0, GL_BGRA, GL_UNSIGNED_BYTE, cairo_image_surface_get_data(surface));
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	/* Draw surface */
+	glDisable(GL_LIGHTING);
+	glDisable(GL_COLOR_MATERIAL);
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glDisable(GL_CULL_FACE);
+	glTranslatef(win_width - width, win_height - height, 0);
+	glBegin(GL_QUADS);
+	glTexCoord2f(1, 0); glVertex3f(width, 0     , 0); // 0 - 3    0
+	glTexCoord2f(1, 1); glVertex3f(width, height, 0); // 1 - |    |
+	glTexCoord2f(0, 1); glVertex3f(0    , height, 0); // 2 - |    |
+	glTexCoord2f(0, 0); glVertex3f(0    , 0     , 0); // 3 - 2----1
+	glEnd();
+}
+
 /***********
  * Methods *
  ***********/
@@ -253,6 +331,12 @@ GritsPluginEnv *grits_plugin_env_new(GritsViewer *viewer, GritsPrefs *prefs)
 	g_signal_connect(compass, "clicked", G_CALLBACK(compass_click), viewer);
 	grits_object_set_cursor(GRITS_OBJECT(compass), GDK_CROSS);
 	env->refs = g_list_prepend(env->refs, compass);
+
+	/* Add info */
+	//GritsCallback *info = grits_callback_new(info_expose, env);
+	//grits_viewer_add(viewer, GRITS_OBJECT(info), GRITS_LEVEL_HUD, FALSE);
+	//env->refs = g_list_prepend(env->refs, info);
+	(void)info_expose;
 
 	/* Add background */
 	//GritsTile *background = grits_tile_new(NULL, NORTH, SOUTH, EAST, WEST);

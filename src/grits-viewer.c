@@ -61,6 +61,16 @@ static void _grits_viewer_fix_location(GritsViewer *viewer)
 	viewer->location[2] = ABS(viewer->location[2]);
 }
 
+static void _grits_viewer_fix_rotation(GritsViewer *viewer)
+{
+	while (viewer->rotation[0] < -180) viewer->rotation[0] += 360;
+	while (viewer->rotation[0] >  180) viewer->rotation[0] -= 360;
+	while (viewer->rotation[1] < -180) viewer->rotation[1] += 360;
+	while (viewer->rotation[1] >  180) viewer->rotation[1] -= 360;
+	while (viewer->rotation[2] < -180) viewer->rotation[2] += 360;
+	while (viewer->rotation[2] >  180) viewer->rotation[2] -= 360;
+}
+
 /* Signal helpers */
 static void _grits_viewer_emit_location_changed(GritsViewer *viewer)
 {
@@ -327,6 +337,7 @@ void grits_viewer_set_rotation(GritsViewer *viewer, gdouble x, gdouble y, gdoubl
 	viewer->rotation[0] = x;
 	viewer->rotation[1] = y;
 	viewer->rotation[2] = z;
+	_grits_viewer_fix_rotation(viewer);
 	_grits_viewer_emit_rotation_changed(viewer);
 }
 
@@ -364,6 +375,7 @@ void grits_viewer_rotate(GritsViewer *viewer, gdouble x, gdouble y, gdouble z)
 	viewer->rotation[0] += x;
 	viewer->rotation[1] += y;
 	viewer->rotation[2] += z;
+	_grits_viewer_fix_rotation(viewer);
 	_grits_viewer_emit_rotation_changed(viewer);
 }
 

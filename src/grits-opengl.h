@@ -38,7 +38,7 @@ struct _GritsOpenGL {
 	GritsViewer parent_instance;
 
 	/* instance members */
-	GTree      *objects;
+	GQueue     *objects;
 	GMutex     *objects_lock;
 	RoamSphere *sphere;
 	GMutex     *sphere_lock;

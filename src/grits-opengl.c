@@ -48,6 +48,7 @@
  * This way us we can remove objects from the level just by fixing up links
  * I.e. we don't need to do a lookup to remove an object if we have its GList */
 struct RenderLevel {
+	gint  num;
 	GList unsorted;
 	GList sorted;
 };
@@ -139,47 +140,19 @@ static void _set_visuals(GritsOpenGL *opengl)
 	g_mutex_unlock(opengl->sphere_lock);
 }
 
-typedef gboolean (*GritsLevelFunc)(GritsObject *obj, gpointer user_data, gint level, gboolean sorted);
-
-static gboolean _foreach_object_cb(gpointer key, gpointer value, gpointer pointers)
-{
-	struct RenderLevel *level = value;
-	GritsLevelFunc user_func = ((gpointer*)pointers)[0];
-	gpointer       user_data = ((gpointer*)pointers)[1];
-	for (GList *cur = level->unsorted.next; cur; cur = cur->next)
-		if (user_func(cur->data, user_data, (gint)key, FALSE))
-			return TRUE;
-	for (GList *cur = level->sorted.next;   cur; cur = cur->next)
-		if (user_func(cur->data, user_data, (gint)key, TRUE))
-			return TRUE;
-	return FALSE;
-}
-
-static void _foreach_object(GritsOpenGL *opengl, GritsLevelFunc func, gpointer user_data)
-{
-	gpointer pointers[2] = {func, user_data};
-	g_tree_foreach(opengl->objects, _foreach_object_cb, pointers);
-}
-
-static gboolean _add_object_world(GritsObject *object, GPtrArray *array, gint level, gboolean sorted)
-{
-	if (level < GRITS_LEVEL_HUD)
-		g_ptr_array_add(array, object);
-	return FALSE;
-}
-
-static gboolean _add_object_ortho(GritsObject *object, GPtrArray *array, gint level, gboolean sorted)
-{
-	if (level >= GRITS_LEVEL_HUD)
-		g_ptr_array_add(array, object);
-	return FALSE;
-}
-
 static GPtrArray *_objects_to_array(GritsOpenGL *opengl, gboolean ortho)
 {
 	GPtrArray *array = g_ptr_array_new();
-	GritsLevelFunc func = (GritsLevelFunc)(ortho ? _add_object_ortho : _add_object_world);
-	_foreach_object(opengl, func, array);
+	for (GList *i = opengl->objects->head; i; i = i->next) {
+		struct RenderLevel *level = i->data;
+		if ((ortho == TRUE  && level->num <  GRITS_LEVEL_HUD) ||
+		    (ortho == FALSE && level->num >= GRITS_LEVEL_HUD))
+			continue;
+		for (GList *j = level->unsorted.next; j; j = j->next)
+			g_ptr_array_add(array, j->data);
+		for (GList *j = level->sorted.next;   j; j = j->next)
+			g_ptr_array_add(array, j->data);
+	}
 	return array;
 }
 
@@ -316,22 +289,21 @@ static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpo
 	return FALSE;
 }
 
-static gboolean _draw_level(gpointer key, gpointer value, gpointer user_data)
+static void _draw_level(gpointer _level, gpointer _opengl)
 {
-	GritsOpenGL *opengl = user_data;
-	glong lnum = (glong)key;
-	struct RenderLevel *level = value;
+	GritsOpenGL *opengl = _opengl;
+	struct RenderLevel *level = _level;
 
-	g_debug("GritsOpenGL: _draw_level - level=%-4ld", lnum);
+	g_debug("GritsOpenGL: _draw_level - level=%-4d", level->num);
 	int nsorted = 0, nunsorted = 0;
 	GList *cur = NULL;
 
 	/* Configure individual levels */
-	if (lnum < GRITS_LEVEL_WORLD) {
+	if (level->num < GRITS_LEVEL_WORLD) {
 		/* Disable depth for background levels */
 		glDepthMask(FALSE);
 		glDisable(GL_ALPHA_TEST);
-	} else if (lnum < GRITS_LEVEL_OVERLAY) {
+	} else if (level->num < GRITS_LEVEL_OVERLAY) {
 		/* Enable depth and alpha for world levels */
 		glEnable(GL_ALPHA_TEST);
 		glAlphaFunc(GL_GREATER, 0.1);
@@ -343,7 +315,7 @@ static gboolean _draw_level(gpointer key, gpointer value, gpointer user_data)
 	}
 
 	/* Start ortho */
-	if (lnum >= GRITS_LEVEL_HUD) {
+	if (level->num >= GRITS_LEVEL_HUD) {
 		glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
 		glMatrixMode(GL_MODELVIEW);  glPushMatrix(); glLoadIdentity();
 		gint win_width  = GTK_WIDGET(opengl)->allocation.width;
@@ -364,7 +336,7 @@ static gboolean _draw_level(gpointer key, gpointer value, gpointer user_data)
 		grits_object_draw(GRITS_OBJECT(cur->data), opengl);
 
 	/* End ortho */
-	if (lnum >= GRITS_LEVEL_HUD) {
+	if (level->num >= GRITS_LEVEL_HUD) {
 		glMatrixMode(GL_PROJECTION); glPopMatrix();
 		glMatrixMode(GL_MODELVIEW);  glPopMatrix();
 	}
@@ -373,7 +345,6 @@ static gboolean _draw_level(gpointer key, gpointer value, gpointer user_data)
 
 	g_debug("GritsOpenGL: _draw_level - drew %d,%d objects",
 			nunsorted, nsorted);
-	return FALSE;
 }
 
 static gboolean on_expose(GritsOpenGL *opengl, GdkEventExpose *event, gpointer _)
@@ -400,7 +371,7 @@ static gboolean on_expose(GritsOpenGL *opengl, GdkEventExpose *event, gpointer _
 	g_mutex_lock(opengl->objects_lock);
 	if (opengl->wireframe)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	g_tree_foreach(opengl->objects, _draw_level, opengl);
+	g_queue_foreach(opengl->objects, _draw_level, opengl);
 	g_mutex_unlock(opengl->objects_lock);
 #endif
 
@@ -437,7 +408,15 @@ static gboolean on_key_press(GritsOpenGL *opengl, GdkEventKey *event, gpointer _
 
 static gboolean on_chained_event(GritsOpenGL *opengl, GdkEvent *event, gpointer _)
 {
-	_foreach_object(opengl, (GritsLevelFunc)grits_object_event, event);
+	for (GList *i = opengl->objects->tail; i; i = i->prev) {
+		struct RenderLevel *level = i->data;
+		for (GList *j = level->unsorted.next; j; j = j->next)
+			if (grits_object_event(j->data, event))
+				return TRUE;
+		for (GList *j = level->sorted.next;   j; j = j->next)
+			if (grits_object_event(j->data, event))
+				return TRUE;
+	}
 	return FALSE;
 }
 
@@ -621,16 +600,45 @@ static void grits_opengl_clear_height_func(GritsViewer *_opengl)
 		_grits_opengl_clear_height_func_rec(opengl->sphere->roots[i]);
 }
 
+static gint _objects_find(gconstpointer a, gconstpointer b)
+{
+	const struct RenderLevel *level = a;
+	const gint *key = b;
+	return level->num == *key ? 0 : 1;
+}
+
+static gint _objects_sort(gconstpointer _a, gconstpointer _b, gpointer _)
+{
+	const struct RenderLevel *a = _a;
+	const struct RenderLevel *b = _b;
+	return a->num < b->num ? -1 :
+	       a->num > b->num ?  1 : 0;
+}
+
+static void _objects_free(gpointer value, gpointer _)
+{
+	struct RenderLevel *level = value;
+	if (level->sorted.next)
+		g_list_free(level->sorted.next);
+	if (level->unsorted.next)
+		g_list_free(level->unsorted.next);
+	g_free(level);
+}
+
 static gpointer grits_opengl_add(GritsViewer *_opengl, GritsObject *object,
-		gint key, gboolean sort)
+		gint num, gboolean sort)
 {
 	g_assert(GRITS_IS_OPENGL(_opengl));
 	GritsOpenGL *opengl = GRITS_OPENGL(_opengl);
 	g_mutex_lock(opengl->objects_lock);
-	struct RenderLevel *level = g_tree_lookup(opengl->objects, (gpointer)(gintptr)key);
-	if (!level) {
+	struct RenderLevel *level = NULL;
+	GList *tmp = g_queue_find_custom(opengl->objects, &num, _objects_find);
+	if (tmp) {
+		level = tmp->data;
+	} else {
 		level = g_new0(struct RenderLevel, 1);
-		g_tree_insert(opengl->objects, (gpointer)(gintptr)key, level);
+		level->num = num;
+		g_queue_insert_sorted(opengl->objects, level, _objects_sort, NULL);
 	}
 	GList *list = sort ? &level->sorted : &level->unsorted;
 	/* Put the link in the list */
@@ -666,27 +674,11 @@ static GritsObject *grits_opengl_remove(GritsViewer *_opengl, GritsObject *objec
 /****************
  * GObject code *
  ****************/
-static int _objects_cmp(gconstpointer _a, gconstpointer _b, gpointer _)
-{
-	gintptr a = (gintptr)_a, b = (gintptr)_b;
-	return a < b ? -1 :
-	       a > b ?  1 : 0;
-}
-static void _objects_free(gpointer value)
-{
-	struct RenderLevel *level = value;
-	if (level->sorted.next)
-		g_list_free(level->sorted.next);
-	if (level->unsorted.next)
-		g_list_free(level->unsorted.next);
-	g_free(level);
-}
-
 G_DEFINE_TYPE(GritsOpenGL, grits_opengl, GRITS_TYPE_VIEWER);
 static void grits_opengl_init(GritsOpenGL *opengl)
 {
 	g_debug("GritsOpenGL: init");
-	opengl->objects      = g_tree_new_full(_objects_cmp, NULL, NULL, _objects_free);
+	opengl->objects      = g_queue_new();
 	opengl->objects_lock = g_mutex_new();
 	opengl->sphere       = roam_sphere_new(opengl);
 	opengl->sphere_lock  = g_mutex_new();
@@ -717,7 +709,8 @@ static void grits_opengl_finalize(GObject *_opengl)
 	g_debug("GritsOpenGL: finalize");
 	GritsOpenGL *opengl = GRITS_OPENGL(_opengl);
 	roam_sphere_free(opengl->sphere);
-	g_tree_destroy(opengl->objects);
+	g_queue_foreach(opengl->objects, _objects_free, NULL);
+	g_queue_free(opengl->objects);
 	g_mutex_free(opengl->objects_lock);
 	g_mutex_free(opengl->sphere_lock);
 	G_OBJECT_CLASS(grits_opengl_parent_class)->finalize(_opengl);

@@ -180,13 +180,6 @@ static void on_view_changed(GritsViewer *viewer,
 	gtk_widget_queue_draw(GTK_WIDGET(viewer));
 }
 
-static void on_realize(GritsViewer *viewer)
-{
-	GdkCursor *cursor = gdk_cursor_new(GDK_FLEUR);
-	GdkWindow *window = gtk_widget_get_window(GTK_WIDGET(viewer));
-	gdk_window_set_cursor(window, cursor);
-}
-
 /***********
  * Methods *
  ***********/
@@ -608,8 +601,6 @@ static void grits_viewer_init(GritsViewer *viewer)
 
 	g_signal_connect(viewer, "location-changed",     G_CALLBACK(on_view_changed),   NULL);
 	g_signal_connect(viewer, "rotation-changed",     G_CALLBACK(on_view_changed),   NULL);
-
-	g_signal_connect(viewer, "realize",              G_CALLBACK(on_realize),        NULL);
 }
 static void grits_viewer_finalize(GObject *gobject)
 {

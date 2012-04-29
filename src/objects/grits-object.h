@@ -57,6 +57,7 @@ struct _GritsObject {
 	guint32      skip;   // Bit mask of safe operations
 
 	GritsState   state;  // Internal, used for picking
+	GdkCursor   *cursor; // Internal, cached cursor
 };
 
 struct _GritsObjectClass {
@@ -87,6 +88,15 @@ gboolean grits_object_event(GritsObject *object, GdkEvent *event);
  * Cause the widget to be redrawn on the screen at some later point
  */
 void grits_object_queue_draw(GritsObject *object);
+
+/**
+ * grits_object_set_cursor:
+ * @object: The #GritsObject to set the cursor for
+ * @cursor: The cursor to use when the object is hovered over
+ *
+ * Causes the cursor to use a particular icon when located over a given object
+ */
+void grits_object_set_cursor(GritsObject *object, GdkCursorType cursor);
 
 /**
  * grits_object_center:

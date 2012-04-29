@@ -200,7 +200,8 @@ static gboolean on_configure(GritsOpenGL *opengl, GdkEventConfigure *event, gpoi
 	return FALSE;
 }
 
-static gint run_picking(GritsOpenGL *opengl, GdkEvent *event, GPtrArray *objects)
+static gint run_picking(GritsOpenGL *opengl, GdkEvent *event,
+		GPtrArray *objects, GritsObject **top)
 {
 	/* Setup picking buffers */
 	guint buffer[100][4] = {};
@@ -230,6 +231,7 @@ static gint run_picking(GritsOpenGL *opengl, GdkEvent *event, GPtrArray *objects
 		guint        index  = buffer[i][3];
 		GritsObject *object = objects->pdata[index];
 		object->state.picked = TRUE;
+		*top = object;
 	}
 
 	/* Notify objects of pointer movements */
@@ -263,6 +265,7 @@ static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpo
 
 	g_mutex_lock(opengl->objects_lock);
 
+	GritsObject *top = NULL;
 	GPtrArray *ortho = _objects_to_array(opengl, TRUE);
 	GPtrArray *world = _objects_to_array(opengl, FALSE);
 
@@ -270,14 +273,24 @@ static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpo
 	glMatrixMode(GL_PROJECTION); glLoadIdentity();
 	gluPickMatrix(gl_x, gl_y, delta, delta, viewport);
 	glMultMatrixd(projection);
-	gint world_hits = run_picking(opengl, (GdkEvent*)event, world);
+	gint world_hits = run_picking(opengl, (GdkEvent*)event, world, &top);
 
 	/* Run ortho picking */
 	glMatrixMode(GL_PROJECTION); glLoadIdentity();
 	gluPickMatrix(gl_x, gl_y, delta, delta, viewport);
 	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
 	glOrtho(0, viewport[2], viewport[3], 0, 1000, -1000);
-	gint ortho_hits = run_picking(opengl, (GdkEvent*)event, ortho);
+	gint ortho_hits = run_picking(opengl, (GdkEvent*)event, ortho, &top);
+
+	/* Update cursor */
+	static GdkCursor *cursor = NULL;
+	static GdkWindow *window = NULL;
+	if (!window || !cursor) {
+		cursor = gdk_cursor_new(GDK_FLEUR);
+		window = gtk_widget_get_window(GTK_WIDGET(opengl));
+	}
+	GdkCursor *topcursor = top && top->cursor ? top->cursor : cursor;
+	gdk_window_set_cursor(window, topcursor);
 
 	g_debug("GritsOpenGL: on_motion_notify - hits=%d/%d,%d/%d ev=%.0lf,%.0lf",
 			world_hits, world->len, ortho_hits, ortho->len, gl_x, gl_y);

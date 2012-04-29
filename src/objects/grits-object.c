@@ -166,6 +166,12 @@ void grits_object_queue_draw(GritsObject *object)
 		gtk_widget_queue_draw(GTK_WIDGET(object->viewer));
 }
 
+void grits_object_set_cursor(GritsObject *object, GdkCursorType cursor)
+{
+	// Used by grits OpenGL
+	object->cursor = gdk_cursor_new(cursor);
+}
+
 /* Event handling */
 void grits_object_pick(GritsObject *object, GritsOpenGL *opengl)
 {

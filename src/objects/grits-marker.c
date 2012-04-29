@@ -39,8 +39,9 @@
 static void render_point(GritsMarker *marker)
 {
 	/* Draw outline */
-	cairo_set_source_rgba(marker->cairo, 0, 0, 0, 1);
+	cairo_set_line_join(marker->cairo, CAIRO_LINE_JOIN_ROUND);
 	cairo_set_line_width(marker->cairo, marker->outline*2);
+	cairo_set_source_rgba(marker->cairo, 0, 0, 0, 1);
 
 	cairo_arc(marker->cairo, marker->xoff, marker->yoff, marker->radius,
 	          0, 2*G_PI);
@@ -58,6 +59,9 @@ static void render_label(GritsMarker *marker)
 {
 	g_assert(marker->label);
 
+	/* Draw outline */
+	cairo_set_line_join(marker->cairo, CAIRO_LINE_JOIN_ROUND);
+	cairo_set_line_width(marker->cairo, marker->outline*2);
 	cairo_set_source_rgba(marker->cairo, 0, 0, 0, 1);
 	cairo_select_font_face(marker->cairo, "sans-serif",
 			CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);

@@ -27,14 +27,19 @@
 #include <math.h>
 
 #include <grits.h>
+
+#ifdef HAVE_GLUT
 #include <GL/glut.h>
+#endif
 
 #include "env.h"
 
 /***********
  * Helpers *
  ***********/
-static void expose_sky(GritsCallback *sky, GritsOpenGL *opengl, gpointer _env)
+
+/* Sky */
+static void sky_expose(GritsCallback *sky, GritsOpenGL *opengl, gpointer _env)
 {
 	GritsPluginEnv *env = GRITS_PLUGIN_ENV(_env);
 	g_debug("GritsPluginEnv: expose_sky");
@@ -76,46 +81,146 @@ static void expose_sky(GritsCallback *sky, GritsOpenGL *opengl, gpointer _env)
 	glEnd();
 }
 
-static void expose_hud(GritsCallback *hud, GritsOpenGL *opengl, gpointer _env)
+/* Compass */
+static void compass_draw_compass(gdouble scale)
+{
+	gfloat thick = scale * 0.20;
+
+	/* Setup lighting */
+	float light_ambient[]  = {0.4f, 0.4f, 0.4f, 0.4f};
+	float light_diffuse[]  = {0.9f, 0.9f, 0.9f, 1.0f};
+	float light_position[] = {-scale*2, -scale*4, -scale*0.5, 1.0f};
+	glLightfv(GL_LIGHT0, GL_AMBIENT,  light_ambient);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE,  light_diffuse);
+	glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+
+	/* Compass data */
+	gdouble colors[][3] = {
+		{1, 0, 0},
+		{1, 1, 1},
+		{1, 1, 1},
+		{1, 1, 1},
+	};
+	gdouble points[][3] = {
+		{     0, -scale,      0},
+		{     0,      0,  thick},
+		{ thick, -thick,      0},
+		{     0,      0, -thick},
+		{-thick, -thick,      0},
+	};
+	gint faces[][3] = {
+		{1, 0, 2},
+		{2, 0, 3},
+		{3, 0, 4},
+		{4, 0, 1},
+	};
+	gint outline[] = {
+		2, 0, 4,
+		1, 2, 3, 4,
+	};
+
+	/* Draw compas */
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glPolygonOffset(1, 1);
+	for (int i = 0; i < G_N_ELEMENTS(colors); i++) {
+		gdouble *color = colors[i];
+		glColor3dv(color);
+		for (int j = 0; j < G_N_ELEMENTS(faces); j++) {
+			gdouble norm[3];
+			gdouble *v0 = points[faces[j][0]];
+			gdouble *v1 = points[faces[j][1]];
+			gdouble *v2 = points[faces[j][2]];
+			crossd3(v2, v1, v0, norm);
+			glNormal3dv(norm);
+			glBegin(GL_TRIANGLES);
+			glVertex3dv(v0);
+			glVertex3dv(v1);
+			glVertex3dv(v2);
+			glEnd();
+		}
+		glRotatef(90, 0, 0, 1);
+	}
+
+	/* Draw outline */
+	glEnable(GL_POLYGON_OFFSET_LINE);
+	glDisable(GL_LIGHTING);
+	glPolygonOffset(0, 0);
+	glColor4f(0, 0, 0, 0.25);
+	glLineWidth(1);
+	for (int i = 0; i < G_N_ELEMENTS(colors); i++) {
+		glBegin(GL_LINE_STRIP);
+		for (int j = 0; j < G_N_ELEMENTS(outline); j++)
+			glVertex3dv(points[outline[j]]);
+		glEnd();
+		glRotatef(90, 0, 0, 1);
+	}
+}
+
+static gboolean compass_draw_teapot(gdouble scale, GritsPluginEnv *env)
+{
+	static int teatime = 0;
+#ifdef HAVE_GLUT
+	static int init, argc; char *argv[] = {"", NULL};
+	if (!init) {
+		teatime = grits_prefs_get_boolean(env->prefs, "grits/teatime", NULL);
+		glutInit(&argc, argv);
+		init = 1;
+		g_message("teatime=%d", teatime);
+	}
+
+	if (teatime) {
+		/* Setup lighting */
+		float light_ambient[]  = {0.1f, 0.1f, 0.0f, 1.0f};
+		float light_diffuse[]  = {0.9f, 0.9f, 0.9f, 1.0f};
+		float light_position[] = {-50.0f, -40.0f, -80.0f, 1.0f};
+		glLightfv(GL_LIGHT0, GL_AMBIENT,  light_ambient);
+		glLightfv(GL_LIGHT0, GL_DIFFUSE,  light_diffuse);
+		glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+
+		/* Draw teapot */
+		glRotatef(-90, 0, 0, 1);
+		glRotatef(-90, 1, 0, 0);
+		glColor4f(0.9, 0.9, 0.7, 1.0);
+		glutSolidTeapot(scale * 0.60);
+	}
+#endif
+	return teatime;
+}
+
+static void compass_expose(GritsCallback *compass, GritsOpenGL *opengl, gpointer _env)
 {
 	GritsPluginEnv *env = GRITS_PLUGIN_ENV(_env);
-	g_debug("GritsPluginEnv: expose_hud");
+	g_debug("GritsPluginEnv: compass_expose");
 	gdouble x, y, z;
 	grits_viewer_get_rotation(env->viewer, &x, &y, &z);
 
 	/* Setup projection */
 	gint win_width  = GTK_WIDGET(opengl)->allocation.width;
 	gint win_height = GTK_WIDGET(opengl)->allocation.height;
-	float scale     = MIN(win_width, win_height) / 10.0;
-	float offset    = scale+20;
-	glTranslatef(offset, offset, 0);
-
-	/* Setup lighting */
-	float light_ambient[]  = {0.1f, 0.1f, 0.0f, 1.0f};
-	float light_diffuse[]  = {0.9f, 0.9f, 0.9f, 1.0f};
-	float light_position[] = {-50.0f, -40.0f, -80.0f, 1.0f};
-	glLightfv(GL_LIGHT0, GL_AMBIENT,  light_ambient);
-	glLightfv(GL_LIGHT0, GL_DIFFUSE,  light_diffuse);
-	glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+	float scale     = CLAMP(MIN(win_width,win_height)/2.0 * 0.1, 40, 100);
+	float offset    = scale + 20;
+	glTranslatef(win_width - offset, offset, 0);
 
 	/* Setup state */
 	glClear(GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_COLOR_MATERIAL);
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
+	glEnable(GL_POLYGON_SMOOTH);
+	glEnable(GL_LINE_SMOOTH);
 
-	/* Draw compas */
+	/* Draw compass */
+	x = CLAMP(x, -66, 66);;
 	glRotatef(x, 1, 0, 0);
 	glRotatef(-z, 0, 0, 1);
-	glRotatef(-90, 0, 0, 1);
-	glRotatef(-90, 1, 0, 0);
-	glColor4f(0.9, 0.9, 0.7, 1.0);
-	glutSolidTeapot(scale * 0.5);
+	if (!compass_draw_teapot(scale, env))
+		compass_draw_compass(scale);
 }
 
-static void click_hud(GritsCallback *hud, GritsViewer *viewer)
+static gboolean compass_click(GritsCallback *compass, GdkEvent *evnet, GritsViewer *viewer)
 {
 	grits_viewer_set_rotation(viewer, 0, 0, 0);
+	return TRUE;
 }
 
 /***********
@@ -135,15 +240,19 @@ GritsPluginEnv *grits_plugin_env_new(GritsViewer *viewer, GritsPrefs *prefs)
 	g_debug("GritsPluginEnv: new");
 	GritsPluginEnv *env = g_object_new(GRITS_TYPE_PLUGIN_ENV, NULL);
 	env->viewer = g_object_ref(viewer);
+	env->prefs  = g_object_ref(prefs);
 
 	/* Add sky */
-	GritsCallback *sky = grits_callback_new(expose_sky, env);
-	GritsCallback *hud = grits_callback_new(expose_hud, env);
+	GritsCallback *sky = grits_callback_new(sky_expose, env);
 	grits_viewer_add(viewer, GRITS_OBJECT(sky), GRITS_LEVEL_BACKGROUND, FALSE);
-	grits_viewer_add(viewer, GRITS_OBJECT(hud), GRITS_LEVEL_HUD, FALSE);
-	g_signal_connect(hud, "clicked", G_CALLBACK(click_hud), viewer);
 	env->refs = g_list_prepend(env->refs, sky);
-	env->refs = g_list_prepend(env->refs, hud);
+
+	/* Add compass */
+	GritsCallback *compass = grits_callback_new(compass_expose, env);
+	grits_viewer_add(viewer, GRITS_OBJECT(compass), GRITS_LEVEL_HUD, FALSE);
+	g_signal_connect(compass, "clicked", G_CALLBACK(compass_click), viewer);
+	grits_object_set_cursor(GRITS_OBJECT(compass), GDK_CROSS);
+	env->refs = g_list_prepend(env->refs, compass);
 
 	/* Add background */
 	//GritsTile *background = grits_tile_new(NULL, NORTH, SOUTH, EAST, WEST);
@@ -193,8 +302,6 @@ static void grits_plugin_env_dispose(GObject *gobject)
 static void grits_plugin_env_class_init(GritsPluginEnvClass *klass)
 {
 	g_debug("GritsPluginEnv: class_init");
-	int argc = 1; char *argv[] = {"", NULL};
-	glutInit(&argc, argv);
 	GObjectClass *gobject_class = (GObjectClass*)klass;
 	gobject_class->dispose = grits_plugin_env_dispose;
 }

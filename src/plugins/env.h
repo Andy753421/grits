@@ -35,6 +35,7 @@ struct _GritsPluginEnv {
 
 	/* instance members */
 	GritsViewer *viewer;
+	GritsPrefs  *prefs;
 	guint        tex;
 	GritsTile   *background;
 	GList       *refs;

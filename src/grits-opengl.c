@@ -307,11 +307,9 @@ static void _draw_level(gpointer _level, gpointer _opengl)
 		/* Enable depth and alpha for world levels */
 		glEnable(GL_ALPHA_TEST);
 		glAlphaFunc(GL_GREATER, 0.1);
-		glDepthMask(TRUE);
 	} else {
 		/* Disable depth for Overlay/HUD levels */
-		// This causes rendering glitches not sure why..
-		//glDepthMask(FALSE);
+		glDepthMask(FALSE);
 	}
 
 	/* Start ortho */
@@ -340,6 +338,9 @@ static void _draw_level(gpointer _level, gpointer _opengl)
 		glMatrixMode(GL_PROJECTION); glPopMatrix();
 		glMatrixMode(GL_MODELVIEW);  glPopMatrix();
 	}
+
+	/* Leave depth buffer write enabled */
+	glDepthMask(TRUE);
 
 	/* TODO: Prune empty levels */
 

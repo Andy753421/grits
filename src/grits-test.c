@@ -21,6 +21,8 @@
 
 #include "grits.h"
 
+#include "compat.h"
+
 GritsPrefs   *prefs   = NULL;
 GritsPlugins *plugins = NULL;
 GritsViewer  *viewer  = NULL;
@@ -72,7 +74,7 @@ int main(int argc, char **argv)
 	viewer  = grits_opengl_new(plugins, prefs);
 
 	GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-	GtkWidget *vbox   = gtk_vbox_new(FALSE, 0);
+	GtkWidget *vbox   = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	GtkWidget *config = gtk_notebook_new();
 	g_signal_connect(window, "delete-event",    G_CALLBACK(on_delete),    NULL);
 	g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), NULL);
@@ -97,7 +99,7 @@ int main(int argc, char **argv)
 	gtk_widget_show_all(config);
 	gtk_main();
 
-	gdk_display_close(gdk_display_get_default());
+	//gdk_display_close(gdk_display_get_default());
 
 	prefs   = NULL;
 	plugins = NULL;

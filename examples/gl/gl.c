@@ -100,10 +100,15 @@ gpointer setup(GtkWidget *widget)
 	XVisualInfo *xvinfo  = glXChooseVisual(xdisplay, nscreen, attribs);
 	GLXContext   context = glXCreateContext(xdisplay, xvinfo, 0, True);
 
-	/* Fix up colormap */
+	/* Fix up visual/colormap */
+#if GTK_CHECK_VERSION(3,0,0)
+	GdkVisual *visual = gdk_x11_screen_lookup_visual(screen, xvinfo->visualid);
+	gtk_widget_set_visual(widget, visual);
+#else
 	GdkVisual   *visual  = gdk_x11_screen_lookup_visual(screen, xvinfo->visualid);
 	GdkColormap *cmap    = gdk_colormap_new(visual, FALSE);
 	gtk_widget_set_colormap(widget, cmap);
+#endif
 
 	/* Disable GTK double buffering */
 	gtk_widget_set_double_buffered(widget, FALSE);
@@ -326,7 +331,7 @@ int main(int argc, char **argv)
 {
 	gtk_init_check(&argc, &argv);
 	GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-	GtkWidget *box    = gtk_vbox_new(FALSE, 5);
+	GtkWidget *box    = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
 	GtkWidget *draw   = gtk_drawing_area_new();
 	GtkWidget *label  = gtk_label_new("Hello, World");
 	GtkWidget *button = gtk_button_new_with_label("Hello, World");
@@ -334,7 +339,11 @@ int main(int argc, char **argv)
 	g_signal_connect(window, "destroy",         G_CALLBACK(gtk_main_quit), NULL);
 	g_signal_connect(window, "key-press-event", G_CALLBACK(key_press),     NULL);
 	//g_signal_connect(draw,   "configure-event", G_CALLBACK(configure),     data);
+#if GTK_CHECK_VERSION(3,0,0)
+	g_signal_connect(draw,   "draw",            G_CALLBACK(expose),        data);
+#else
 	g_signal_connect(draw,   "expose-event",    G_CALLBACK(expose),        data);
+#endif
 	gtk_widget_set_size_request(draw,   300, 300);
 	gtk_widget_set_size_request(button, -1,  50);
 	gtk_box_pack_start(GTK_BOX(box), label,  FALSE, TRUE, 0);

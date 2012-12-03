@@ -1,4 +1,4 @@
-PKGS=gtk+-2.0
+PKGS=gtk+-3.0
 PROGS=gl
 
 # Cairo

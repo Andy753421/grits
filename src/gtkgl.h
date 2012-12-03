@@ -33,10 +33,10 @@
 /* Call before widget is realized */
 void gtk_gl_enable(GtkWidget *widget);
 
-/* Call at the start of "expose-event" */
+/* Call at the start of expose */
 void gtk_gl_begin(GtkWidget *widget);
 
-/* Call at the end of "expose-event" */
+/* Call at the end of expose */
 void gtk_gl_end(GtkWidget *widget);
 
 /* Call when done to cleanup data */

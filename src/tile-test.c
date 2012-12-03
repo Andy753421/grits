@@ -23,6 +23,8 @@
 #include "data/grits-tms.h"
 #include "objects/grits-tile.h"
 
+#include "compat.h"
+
 struct CacheState {
 	GtkWidget *image;
 	GtkWidget *status;
@@ -151,8 +153,8 @@ int main(int argc, char **argv)
 	gtk_init(&argc, &argv);
 
 	GtkWidget *win        = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-	GtkWidget *vbox1      = gtk_vbox_new(FALSE, 0);
-	GtkWidget *vbox2      = gtk_vbox_new(FALSE, 0);
+	GtkWidget *vbox1      = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+	GtkWidget *vbox2      = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	GtkWidget *status     = gtk_statusbar_new();
 	GtkWidget *scroll     = gtk_scrolled_window_new(NULL, NULL);
 	GtkWidget *bmng_image = gtk_image_new();

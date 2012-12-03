@@ -447,7 +447,11 @@ static void on_realize(GritsOpenGL *opengl, gpointer _)
 	/* Connect signals and idle functions now that opengl is fully initialized */
 	gtk_widget_add_events(GTK_WIDGET(opengl), GDK_KEY_PRESS_MASK);
 	g_signal_connect(opengl, "configure-event",  G_CALLBACK(_set_projection), NULL);
+#if GTK_CHECK_VERSION(3,0,0)
+	g_signal_connect(opengl, "draw",             G_CALLBACK(on_expose),       NULL);
+#else
 	g_signal_connect(opengl, "expose-event",     G_CALLBACK(on_expose),       NULL);
+#endif
 
 	g_signal_connect(opengl, "key-press-event",  G_CALLBACK(on_key_press),    NULL);
 

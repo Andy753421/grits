@@ -21,6 +21,7 @@
 
 #include "grits.h"
 
+#include "compat.h"
 
 static GritsPrefs   *prefs;
 static GritsPlugins *plugins;
@@ -127,7 +128,7 @@ static GtkWidget *setup_window(GtkUIManager *manager, GtkWidget **_notebook)
 	GtkWidget *window   = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 	GtkWidget *menu     = gtk_ui_manager_get_widget(manager, "/Menu");
 	GtkWidget *notebook = gtk_notebook_new();
-	GtkWidget *vbox     = gtk_vbox_new(FALSE, 0);
+	GtkWidget *vbox     = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	gtk_container_add(GTK_CONTAINER(window), vbox);
 	gtk_box_pack_start(GTK_BOX(vbox), menu,               FALSE, TRUE, 0);
 	gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(viewer), TRUE,  TRUE, 0);

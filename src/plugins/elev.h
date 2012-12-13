@@ -37,7 +37,7 @@ struct _GritsPluginElev {
 	GritsViewer *viewer;
 	GritsTile   *tiles;
 	GritsWms    *wms;
-	GMutex      *mutex;
+	GMutex       mutex;
 	gulong       sigid;
 };
 

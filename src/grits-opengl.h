@@ -39,9 +39,9 @@ struct _GritsOpenGL {
 
 	/* instance members */
 	GQueue     *objects;
-	GMutex     *objects_lock;
+	GMutex      objects_lock;
 	RoamSphere *sphere;
-	GMutex     *sphere_lock;
+	GMutex      sphere_lock;
 	guint       sm_source[2];
 	guint       ue_source;
 

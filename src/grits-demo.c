@@ -166,7 +166,6 @@ static void restore_states(GtkUIManager *manager)
 
 int main(int argc, char **argv)
 {
-	g_thread_init(NULL);
 	gdk_threads_init();
 	gtk_init(&argc, &argv);
 

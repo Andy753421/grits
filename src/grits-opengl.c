@@ -135,9 +135,9 @@ static void _set_visuals(GritsOpenGL *opengl)
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	//glShadeModel(GL_FLAT);
 
-	g_mutex_lock(opengl->sphere_lock);
+	g_mutex_lock(&opengl->sphere_lock);
 	roam_sphere_update_view(opengl->sphere);
-	g_mutex_unlock(opengl->sphere_lock);
+	g_mutex_unlock(&opengl->sphere_lock);
 }
 
 static GPtrArray *_objects_to_array(GritsOpenGL *opengl, gboolean ortho)
@@ -165,9 +165,9 @@ static gboolean on_configure(GritsOpenGL *opengl, GdkEventConfigure *event, gpoi
 
 	_set_visuals(opengl);
 #ifndef ROAM_DEBUG
-	g_mutex_lock(opengl->sphere_lock);
+	g_mutex_lock(&opengl->sphere_lock);
 	roam_sphere_update_errors(opengl->sphere);
-	g_mutex_unlock(opengl->sphere_lock);
+	g_mutex_unlock(&opengl->sphere_lock);
 #endif
 
 	return FALSE;
@@ -236,7 +236,7 @@ static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpo
 	glMatrixMode(GL_MODELVIEW);  glPushMatrix();
 	glMatrixMode(GL_PROJECTION); glPushMatrix();
 
-	g_mutex_lock(opengl->objects_lock);
+	g_mutex_lock(&opengl->objects_lock);
 
 	GritsObject *top = NULL;
 	GPtrArray *ortho = _objects_to_array(opengl, TRUE);
@@ -271,7 +271,7 @@ static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpo
 	g_ptr_array_free(world, TRUE);
 	g_ptr_array_free(ortho, TRUE);
 
-	g_mutex_unlock(opengl->objects_lock);
+	g_mutex_unlock(&opengl->objects_lock);
 
 
 	/* Test unproject */
@@ -369,11 +369,11 @@ static gboolean on_expose(GritsOpenGL *opengl, GdkEventExpose *event, gpointer _
 	(void)_draw_level;
 	//roam_sphere_draw_normals(opengl->sphere);
 #else
-	g_mutex_lock(opengl->objects_lock);
+	g_mutex_lock(&opengl->objects_lock);
 	if (opengl->wireframe)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	g_queue_foreach(opengl->objects, _draw_level, opengl);
-	g_mutex_unlock(opengl->objects_lock);
+	g_mutex_unlock(&opengl->objects_lock);
 #endif
 
 	gtk_gl_end(GTK_WIDGET(opengl));
@@ -424,9 +424,9 @@ static gboolean on_chained_event(GritsOpenGL *opengl, GdkEvent *event, gpointer 
 static gboolean _update_errors_cb(gpointer _opengl)
 {
 	GritsOpenGL *opengl = _opengl;
-	g_mutex_lock(opengl->sphere_lock);
+	g_mutex_lock(&opengl->sphere_lock);
 	roam_sphere_update_errors(opengl->sphere);
-	g_mutex_unlock(opengl->sphere_lock);
+	g_mutex_unlock(&opengl->sphere_lock);
 	opengl->ue_source = 0;
 	return FALSE;
 }
@@ -448,10 +448,10 @@ static void on_view_changed(GritsOpenGL *opengl,
 static gboolean on_idle(GritsOpenGL *opengl)
 {
 	//g_debug("GritsOpenGL: on_idle");
-	g_mutex_lock(opengl->sphere_lock);
+	g_mutex_lock(&opengl->sphere_lock);
 	if (roam_sphere_split_merge(opengl->sphere))
 		gtk_widget_queue_draw(GTK_WIDGET(opengl));
-	g_mutex_unlock(opengl->sphere_lock);
+	g_mutex_unlock(&opengl->sphere_lock);
 	return TRUE;
 }
 
@@ -561,7 +561,7 @@ static void grits_opengl_set_height_func(GritsViewer *_opengl, GritsBounds *boun
 {
 	GritsOpenGL *opengl = GRITS_OPENGL(_opengl);
 	/* TODO: get points? */
-	g_mutex_lock(opengl->sphere_lock);
+	g_mutex_lock(&opengl->sphere_lock);
 	GList *triangles = roam_sphere_get_intersect(opengl->sphere, TRUE,
 			bounds->n, bounds->s, bounds->e, bounds->w);
 	for (GList *cur = triangles; cur; cur = cur->next) {
@@ -577,7 +577,7 @@ static void grits_opengl_set_height_func(GritsViewer *_opengl, GritsBounds *boun
 		}
 	}
 	g_list_free(triangles);
-	g_mutex_unlock(opengl->sphere_lock);
+	g_mutex_unlock(&opengl->sphere_lock);
 }
 
 static void _grits_opengl_clear_height_func_rec(RoamTriangle *root)
@@ -631,7 +631,7 @@ static gpointer grits_opengl_add(GritsViewer *_opengl, GritsObject *object,
 {
 	g_assert(GRITS_IS_OPENGL(_opengl));
 	GritsOpenGL *opengl = GRITS_OPENGL(_opengl);
-	g_mutex_lock(opengl->objects_lock);
+	g_mutex_lock(&opengl->objects_lock);
 	struct RenderLevel *level = NULL;
 	GList *tmp = g_queue_find_custom(opengl->objects, &num, _objects_find);
 	if (tmp) {
@@ -650,7 +650,7 @@ static gpointer grits_opengl_add(GritsViewer *_opengl, GritsObject *object,
 	if (list->next)
 		list->next->prev = link;
 	list->next = link;
-	g_mutex_unlock(opengl->objects_lock);
+	g_mutex_unlock(&opengl->objects_lock);
 	return link;
 }
 
@@ -659,12 +659,12 @@ static GritsObject *grits_opengl_remove(GritsViewer *_opengl, GritsObject *objec
 	g_assert(GRITS_IS_OPENGL(_opengl));
 	GritsOpenGL *opengl = GRITS_OPENGL(_opengl);
 	GList *link = object->ref;
-	g_mutex_lock(opengl->objects_lock);
+	g_mutex_lock(&opengl->objects_lock);
 	/* Just unlink and free it, link->prev is assured */
 	link->prev->next = link->next;
 	if (link->next)
 		link->next->prev = link->prev;
-	g_mutex_unlock(opengl->objects_lock);
+	g_mutex_unlock(&opengl->objects_lock);
 	object->ref    = NULL;
 	object->viewer = NULL;
 	g_free(link);
@@ -679,10 +679,10 @@ G_DEFINE_TYPE(GritsOpenGL, grits_opengl, GRITS_TYPE_VIEWER);
 static void grits_opengl_init(GritsOpenGL *opengl)
 {
 	g_debug("GritsOpenGL: init");
-	opengl->objects      = g_queue_new();
-	opengl->objects_lock = g_mutex_new();
-	opengl->sphere       = roam_sphere_new(opengl);
-	opengl->sphere_lock  = g_mutex_new();
+	opengl->objects = g_queue_new();
+	opengl->sphere  = roam_sphere_new(opengl);
+	g_mutex_init(&opengl->objects_lock);
+	g_mutex_init(&opengl->sphere_lock);
 	gtk_gl_enable(GTK_WIDGET(opengl));
 	gtk_widget_add_events(GTK_WIDGET(opengl), GDK_KEY_PRESS_MASK);
 	g_signal_connect(opengl, "map", G_CALLBACK(on_realize), NULL);
@@ -712,8 +712,8 @@ static void grits_opengl_finalize(GObject *_opengl)
 	roam_sphere_free(opengl->sphere);
 	g_queue_foreach(opengl->objects, _objects_free, NULL);
 	g_queue_free(opengl->objects);
-	g_mutex_free(opengl->objects_lock);
-	g_mutex_free(opengl->sphere_lock);
+	g_mutex_clear(&opengl->objects_lock);
+	g_mutex_clear(&opengl->sphere_lock);
 	G_OBJECT_CLASS(grits_opengl_parent_class)->finalize(_opengl);
 }
 static void grits_opengl_class_init(GritsOpenGLClass *klass)

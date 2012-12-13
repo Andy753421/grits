@@ -65,7 +65,6 @@ static void load_plugin(GritsPlugins *plugins, gchar *name,
  ***********/
 int main(int argc, char **argv)
 {
-	g_thread_init(NULL);
 	gdk_threads_init();
 	gtk_init(&argc, &argv);
 

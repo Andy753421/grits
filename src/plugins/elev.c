@@ -245,7 +245,7 @@ static void _free_tile(GritsTile *tile, gpointer _elev)
 static gpointer _update_tiles(gpointer _elev)
 {
 	GritsPluginElev *elev = _elev;
-	if (!g_mutex_trylock(elev->mutex))
+	if (!g_mutex_trylock(&elev->mutex))
 		return NULL;
 	GritsPoint eye;
 	grits_viewer_get_location(elev->viewer, &eye.lat, &eye.lon, &eye.elev);
@@ -254,7 +254,7 @@ static gpointer _update_tiles(gpointer _elev)
 			_load_tile, elev);
 	grits_tile_gc(elev->tiles, time(NULL)-10,
 			_free_tile, elev);
-	g_mutex_unlock(elev->mutex);
+	g_mutex_unlock(&elev->mutex);
 	return NULL;
 }
 
@@ -264,7 +264,7 @@ static gpointer _update_tiles(gpointer _elev)
 static void _on_location_changed(GritsViewer *viewer,
 		gdouble lat, gdouble lon, gdouble elevation, GritsPluginElev *elev)
 {
-	g_thread_create(_update_tiles, elev, FALSE, NULL);
+	g_thread_new("update-tiles-thread", _update_tiles, elev);
 }
 
 static gpointer _threaded_init(GritsPluginElev *elev)
@@ -292,7 +292,7 @@ GritsPluginElev *grits_plugin_elev_new(GritsViewer *viewer)
 	elev->viewer = g_object_ref(viewer);
 
 	/* Load initial tiles */
-	g_thread_create((GThreadFunc)_threaded_init, elev, FALSE, NULL);
+	g_thread_new("init-thread", (GThreadFunc)_threaded_init, elev);
 
 	/* Connect signals */
 	elev->sigid = g_signal_connect(elev->viewer, "location-changed",
@@ -324,7 +324,7 @@ static void grits_plugin_elev_init(GritsPluginElev *elev)
 {
 	g_debug("GritsPluginElev: init");
 	/* Set defaults */
-	elev->mutex = g_mutex_new();
+	g_mutex_init(&elev->mutex);
 	elev->tiles = grits_tile_new(NULL, NORTH, SOUTH, EAST, WEST);
 	elev->wms   = grits_wms_new(
 		"http://www.nasa.network.com/elev", "mergedSrtm", "application/bil",
@@ -353,9 +353,9 @@ static void grits_plugin_elev_finalize(GObject *gobject)
 	/* Free data */
 	grits_tile_free(elev->tiles, _free_tile, elev);
 	grits_wms_free(elev->wms);
-	g_mutex_lock(elev->mutex);
-	g_mutex_unlock(elev->mutex);
-	g_mutex_free(elev->mutex);
+	g_mutex_lock(&elev->mutex);
+	g_mutex_unlock(&elev->mutex);
+	g_mutex_clear(&elev->mutex);
 	G_OBJECT_CLASS(grits_plugin_elev_parent_class)->finalize(gobject);
 
 }

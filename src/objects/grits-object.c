@@ -111,7 +111,7 @@ void grits_object_pickdraw(GritsObject *object, GritsOpenGL *opengl, gboolean pi
 	}
 
 	/* Save state, draw, restore state */
-	g_mutex_lock(opengl->sphere_lock);
+	g_mutex_lock(&opengl->sphere_lock);
 	if (!(object->skip & GRITS_SKIP_STATE)) {
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glMatrixMode(GL_PROJECTION); glPushMatrix();
@@ -134,7 +134,7 @@ void grits_object_pickdraw(GritsObject *object, GritsOpenGL *opengl, gboolean pi
 		glMatrixMode(GL_PROJECTION); glPopMatrix();
 		glMatrixMode(GL_MODELVIEW);  glPopMatrix();
 	}
-	g_mutex_unlock(opengl->sphere_lock);
+	g_mutex_unlock(&opengl->sphere_lock);
 }
 
 /**

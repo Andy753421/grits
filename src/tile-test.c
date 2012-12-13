@@ -134,7 +134,6 @@ gboolean key_press_cb(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 
 int main(int argc, char **argv)
 {
-	g_thread_init(NULL);
 	gdk_threads_init();
 	gtk_init(&argc, &argv);
 
@@ -160,9 +159,9 @@ int main(int argc, char **argv)
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
 			GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 
-	g_thread_create(do_bmng_cache, bmng_image, FALSE, NULL);
-	g_thread_create(do_osm_cache,  osm_image,  FALSE, NULL);
-	g_thread_create(do_osm2_cache, osm2_image, FALSE, NULL);
+	g_thread_new("bmng-thread", do_bmng_cache, bmng_image);
+	g_thread_new("osm-thread",  do_osm_cache,  osm_image);
+	g_thread_new("osm2-thread", do_osm2_cache, osm2_image);
 
 	gtk_widget_show_all(win);
 	gtk_main();

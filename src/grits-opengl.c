@@ -216,7 +216,7 @@ static gint run_picking(GritsOpenGL *opengl, GdkEvent *event,
 	return hits;
 }
 
-static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpointer _)
+static gboolean run_mouse_move(GritsOpenGL *opengl, GdkEventMotion *event)
 {
 	gdouble height = GTK_WIDGET(opengl)->allocation.height;
 	gdouble gl_x   = event->x;
@@ -265,7 +265,7 @@ static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpo
 	GdkCursor *topcursor = top && top->cursor ? top->cursor : cursor;
 	gdk_window_set_cursor(window, topcursor);
 
-	g_debug("GritsOpenGL: on_motion_notify - hits=%d/%d,%d/%d ev=%.0lf,%.0lf",
+	g_debug("GritsOpenGL: run_mouse_move - hits=%d/%d,%d/%d ev=%.0lf,%.0lf",
 			world_hits, world->len, ortho_hits, ortho->len, gl_x, gl_y);
 
 	g_ptr_array_free(world, TRUE);
@@ -286,6 +286,13 @@ static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpo
 	if (opengl->pickmode)
 		gtk_gl_end(GTK_WIDGET(opengl));
 
+	return FALSE;
+}
+
+static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpointer _)
+{
+	opengl->mouse_queue = *event;
+	gtk_widget_queue_draw(GTK_WIDGET(opengl));
 	return FALSE;
 }
 
@@ -353,7 +360,12 @@ static gboolean on_expose(GritsOpenGL *opengl, GdkEventExpose *event, gpointer _
 	g_debug("GritsOpenGL: on_expose - begin");
 
 	if (opengl->pickmode)
-		return on_motion_notify(opengl, (GdkEventMotion*)event, NULL);
+		return run_mouse_move(opengl, (GdkEventMotion*)event);
+
+	if (opengl->mouse_queue.type != GDK_NOTHING) {
+		run_mouse_move(opengl, &opengl->mouse_queue);
+		opengl->mouse_queue.type = GDK_NOTHING;
+	}
 
 	gtk_gl_begin(GTK_WIDGET(opengl));
 

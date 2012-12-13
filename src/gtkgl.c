@@ -75,7 +75,7 @@ void gtk_gl_enable(GtkWidget *widget)
 	XVisualInfo *xvinfo  = glXChooseVisual(xdisplay, nscreen, attribs);
 	if (!xvinfo)
 		g_error("GtkGl: enable - unable to get valid OpenGL Visual");
-	GLXContext   context = glXCreateContext(xdisplay, xvinfo, NULL, False);
+	GLXContext   context = glXCreateContext(xdisplay, xvinfo, NULL, True);
 	g_object_set_data(G_OBJECT(widget), "glcontext", context);
 
 	/* Fix up colormap */

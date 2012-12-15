@@ -8,12 +8,12 @@ default:V: run
 # GtkGLExt
 #CPPFLAGS=-DSYS_GTKGLEXT
 #CFLAGS=`{pkg-config --cflags gtkglext-1.0} --std=c99
-#LIBS=-`{pkg-config --libs gtkglext-1.0}
+#LIBS=`{pkg-config --libs gtkglext-1.0} -lm
 #default:V: run
 
 # X11
 #CPPFLAGS=-DSYS_X11
-#LIBS=-lGL
+#LIBS=-lGL -lm
 #default:V: run
 
 # Mac OSX

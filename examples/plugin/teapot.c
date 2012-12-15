@@ -120,8 +120,6 @@ static void grits_plugin_teapot_dispose(GObject *gobject)
 static void grits_plugin_teapot_class_init(GritsPluginTeapotClass *klass)
 {
 	g_debug("GritsPluginTeapot: class_init");
-	int argc = 1; char *argv[] = {"", NULL};
-	glutInit(&argc, argv);
 	GObjectClass *gobject_class = (GObjectClass*)klass;
 	gobject_class->dispose  = grits_plugin_teapot_dispose;
 }

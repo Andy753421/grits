@@ -98,7 +98,7 @@ gpointer setup(GtkWidget *widget)
 	                        GLX_DEPTH_SIZE,  1,
 	                        None};
 	XVisualInfo *xvinfo  = glXChooseVisual(xdisplay, nscreen, attribs);
-	GLXContext   context = glXCreateContext(xdisplay, xvinfo, 0, False);
+	GLXContext   context = glXCreateContext(xdisplay, xvinfo, 0, True);
 
 	/* Fix up colormap */
 	GdkVisual   *visual  = gdk_x11_screen_lookup_visual(screen, xvinfo->visualid);

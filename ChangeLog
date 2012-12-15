@@ -1,5 +1,10 @@
 See the Git log for detailed information
-http://lug.rose-hulman.edu/git/
+http://pileus.org/git/?p=grits
+
+v0.7 (2012/02/15):
+  * Add high resolution OpenStreetMap maps
+  * Allow images in GritsTile
+  * Add GritsLine object
 
 v0.6 (2011/10/31):
   * Update polygon plugin

@@ -6,7 +6,7 @@
 
   <name xml:lang="en">Grits</name>
   <shortdesc xml:lang="en">Virtual Globe library</shortdesc>
-  <homepage rdf:resource="http://lug.rose-hulman.edu/code/projects/grits" />
+  <homepage rdf:resource="http://pileus.org/grits" />
 
   <maintainer>
     <foaf:Person>

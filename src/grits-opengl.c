@@ -56,7 +56,7 @@ struct RenderLevel {
 /***********
  * Helpers *
  ***********/
-static void _set_visuals(GritsOpenGL *opengl)
+static void _set_projection(GritsOpenGL *opengl)
 {
 	double lat, lon, elev, rx, ry, rz;
 	grits_viewer_get_location(GRITS_VIEWER(opengl), &lat, &lon, &elev);
@@ -73,7 +73,6 @@ static void _set_visuals(GritsOpenGL *opengl)
 	double near   = MAX(elev*0.75 - atmos, 50); // View 100km of atmosphere
 	double far    = elev + 2*EARTH_R + atmos;   // on both sides of the earth
 
-	grits_viewer_get_location(GRITS_VIEWER(opengl), &lat, &lon, &elev);
 	glViewport(0, 0, width, height);
 	gluPerspective(rad2deg(ang), width/height, near, far);
 
@@ -86,6 +85,40 @@ static void _set_visuals(GritsOpenGL *opengl)
 	glRotatef(rz, 0, 0, 1);
 
 	/* Lighting */
+	float light_position[] = {-13*EARTH_R, 1*EARTH_R, 3*EARTH_R, 1.0f};
+	glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+
+	/* Camera 2 */
+	glTranslatef(0, 0, -elev2rad(elev));
+	glRotatef(lat, 1, 0, 0);
+	glRotatef(-lon, 0, 1, 0);
+
+	/* Update roam view */
+	g_mutex_lock(&opengl->sphere_lock);
+	roam_sphere_update_view(opengl->sphere);
+	g_mutex_unlock(&opengl->sphere_lock);
+}
+
+static void _set_settings(GritsOpenGL *opengl)
+{
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_BLEND);
+	glDisable(GL_ALPHA_TEST);
+
+	glEnable(GL_LIGHT0);
+	glEnable(GL_LIGHTING);
+
+	glEnable(GL_LINE_SMOOTH);
+
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_COLOR_MATERIAL);
+
+	if (opengl->wireframe)
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	else
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+	/* Lighting */
 #ifdef ROAM_DEBUG
 	float light_ambient[]  = {0.7f, 0.7f, 0.7f, 1.0f};
 	float light_diffuse[]  = {2.0f, 2.0f, 2.0f, 1.0f};
@@ -93,13 +126,10 @@ static void _set_visuals(GritsOpenGL *opengl)
 	float light_ambient[]  = {0.2f, 0.2f, 0.2f, 1.0f};
 	float light_diffuse[]  = {0.8f, 0.8f, 0.8f, 1.0f};
 #endif
-	float light_position[] = {-13*EARTH_R, 1*EARTH_R, 3*EARTH_R, 1.0f};
 	glLightfv(GL_LIGHT0, GL_AMBIENT,  light_ambient);
 	glLightfv(GL_LIGHT0, GL_DIFFUSE,  light_diffuse);
-	glLightfv(GL_LIGHT0, GL_POSITION, light_position);
-	glEnable(GL_LIGHT0);
-	glEnable(GL_LIGHTING);
 
+	/* Materials */
 	float material_ambient[]  = {1.0, 1.0, 1.0, 1.0};
 	float material_diffuse[]  = {1.0, 1.0, 1.0, 1.0};
 	float material_specular[] = {0.0, 0.0, 0.0, 1.0};
@@ -108,20 +138,11 @@ static void _set_visuals(GritsOpenGL *opengl)
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE,  material_diffuse);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, material_specular);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, material_emission);
-	glDisable(GL_TEXTURE_2D);
-	glDisable(GL_COLOR_MATERIAL);
 
-	/* Camera 2 */
-	glTranslatef(0, 0, -elev2rad(elev));
-	glRotatef(lat, 1, 0, 0);
-	glRotatef(-lon, 0, 1, 0);
-
-	glDisable(GL_ALPHA_TEST);
-
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glEnable(GL_BLEND);
-
-#ifndef ROAM_DEBUG
+#ifdef ROAM_DEBUG
+	glColor4f(1.0, 1.0, 1.0, 1.0);
+	glLineWidth(2);
+#else
 	glCullFace(GL_BACK);
 	glEnable(GL_CULL_FACE);
 
@@ -129,15 +150,6 @@ static void _set_visuals(GritsOpenGL *opengl)
 	glDepthFunc(GL_LEQUAL);
 	glEnable(GL_DEPTH_TEST);
 #endif
-
-	glEnable(GL_LINE_SMOOTH);
-
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	//glShadeModel(GL_FLAT);
-
-	g_mutex_lock(&opengl->sphere_lock);
-	roam_sphere_update_view(opengl->sphere);
-	g_mutex_unlock(&opengl->sphere_lock);
 }
 
 static GPtrArray *_objects_to_array(GritsOpenGL *opengl, gboolean ortho)
@@ -159,19 +171,6 @@ static GPtrArray *_objects_to_array(GritsOpenGL *opengl, gboolean ortho)
 /*************
  * Callbacks *
  *************/
-static gboolean on_configure(GritsOpenGL *opengl, GdkEventConfigure *event, gpointer _)
-{
-	g_debug("GritsOpenGL: on_configure");
-
-	_set_visuals(opengl);
-#ifndef ROAM_DEBUG
-	g_mutex_lock(&opengl->sphere_lock);
-	roam_sphere_update_errors(opengl->sphere);
-	g_mutex_unlock(&opengl->sphere_lock);
-#endif
-
-	return FALSE;
-}
 
 static gint run_picking(GritsOpenGL *opengl, GdkEvent *event,
 		GPtrArray *objects, GritsObject **top)
@@ -273,7 +272,6 @@ static gboolean run_mouse_move(GritsOpenGL *opengl, GdkEventMotion *event)
 
 	g_mutex_unlock(&opengl->objects_lock);
 
-
 	/* Test unproject */
 	//gdouble lat, lon, elev;
 	//grits_viewer_unproject(GRITS_VIEWER(opengl),
@@ -369,21 +367,20 @@ static gboolean on_expose(GritsOpenGL *opengl, GdkEventExpose *event, gpointer _
 
 	gtk_gl_begin(GTK_WIDGET(opengl));
 
+	_set_settings(opengl);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	_set_visuals(opengl);
+#ifndef ROAM_DEBUG
+	roam_sphere_update_errors(opengl->sphere);
+	roam_sphere_split_merge(opengl->sphere);
+#endif
+
 #ifdef ROAM_DEBUG
-	glColor4f(1.0, 1.0, 1.0, 1.0);
-	glLineWidth(2);
-	glDisable(GL_TEXTURE_2D);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	roam_sphere_draw(opengl->sphere);
+	roam_sphere_draw_normals(opengl->sphere);
 	(void)_draw_level;
-	//roam_sphere_draw_normals(opengl->sphere);
 #else
 	g_mutex_lock(&opengl->objects_lock);
-	if (opengl->wireframe)
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	g_queue_foreach(opengl->objects, _draw_level, opengl);
 	g_mutex_unlock(&opengl->objects_lock);
 #endif
@@ -433,40 +430,6 @@ static gboolean on_chained_event(GritsOpenGL *opengl, GdkEvent *event, gpointer 
 	return FALSE;
 }
 
-static gboolean _update_errors_cb(gpointer _opengl)
-{
-	GritsOpenGL *opengl = _opengl;
-	g_mutex_lock(&opengl->sphere_lock);
-	roam_sphere_update_errors(opengl->sphere);
-	g_mutex_unlock(&opengl->sphere_lock);
-	opengl->ue_source = 0;
-	return FALSE;
-}
-static void on_view_changed(GritsOpenGL *opengl,
-		gdouble _1, gdouble _2, gdouble _3)
-{
-	g_debug("GritsOpenGL: on_view_changed");
-	_set_visuals(opengl);
-#ifndef ROAM_DEBUG
-	if (!opengl->ue_source)
-		opengl->ue_source = g_idle_add_full(G_PRIORITY_HIGH_IDLE+30,
-				_update_errors_cb, opengl, NULL);
-	//roam_sphere_update_errors(opengl->sphere);
-#else
-	(void)_update_errors_cb;
-#endif
-}
-
-static gboolean on_idle(GritsOpenGL *opengl)
-{
-	//g_debug("GritsOpenGL: on_idle");
-	g_mutex_lock(&opengl->sphere_lock);
-	if (roam_sphere_split_merge(opengl->sphere))
-		gtk_widget_queue_draw(GTK_WIDGET(opengl));
-	g_mutex_unlock(&opengl->sphere_lock);
-	return TRUE;
-}
-
 static void on_realize(GritsOpenGL *opengl, gpointer _)
 {
 	g_debug("GritsOpenGL: on_realize");
@@ -474,13 +437,13 @@ static void on_realize(GritsOpenGL *opengl, gpointer _)
 
 	/* Connect signals and idle functions now that opengl is fully initialized */
 	gtk_widget_add_events(GTK_WIDGET(opengl), GDK_KEY_PRESS_MASK);
-	g_signal_connect(opengl, "configure-event",  G_CALLBACK(on_configure),    NULL);
+	g_signal_connect(opengl, "configure-event",  G_CALLBACK(_set_projection), NULL);
 	g_signal_connect(opengl, "expose-event",     G_CALLBACK(on_expose),       NULL);
 
 	g_signal_connect(opengl, "key-press-event",  G_CALLBACK(on_key_press),    NULL);
 
-	g_signal_connect(opengl, "location-changed", G_CALLBACK(on_view_changed), NULL);
-	g_signal_connect(opengl, "rotation-changed", G_CALLBACK(on_view_changed), NULL);
+	g_signal_connect(opengl, "location-changed", G_CALLBACK(_set_projection), NULL);
+	g_signal_connect(opengl, "rotation-changed", G_CALLBACK(_set_projection), NULL);
 
 	g_signal_connect(opengl, "motion-notify-event", G_CALLBACK(on_motion_notify), NULL);
 	g_signal_connect_after(opengl, "key-press-event",      G_CALLBACK(on_chained_event), NULL);
@@ -488,14 +451,6 @@ static void on_realize(GritsOpenGL *opengl, gpointer _)
 	g_signal_connect_after(opengl, "button-press-event",   G_CALLBACK(on_chained_event), NULL);
 	g_signal_connect_after(opengl, "button-release-event", G_CALLBACK(on_chained_event), NULL);
 	g_signal_connect_after(opengl, "motion-notify-event",  G_CALLBACK(on_chained_event), NULL);
-
-#ifndef ROAM_DEBUG
-	opengl->sm_source[0] = g_timeout_add_full(G_PRIORITY_HIGH_IDLE+30, 33,  (GSourceFunc)on_idle, opengl, NULL);
-	opengl->sm_source[1] = g_timeout_add_full(G_PRIORITY_HIGH_IDLE+10, 500, (GSourceFunc)on_idle, opengl, NULL);
-#else
-	(void)on_idle;
-	(void)_update_errors_cb;
-#endif
 
 	/* Re-queue resize incase configure was triggered before realize */
 	gtk_widget_queue_resize(GTK_WIDGET(opengl));
@@ -702,19 +657,6 @@ static void grits_opengl_init(GritsOpenGL *opengl)
 static void grits_opengl_dispose(GObject *_opengl)
 {
 	g_debug("GritsOpenGL: dispose");
-	GritsOpenGL *opengl = GRITS_OPENGL(_opengl);
-	if (opengl->sm_source[0]) {
-		g_source_remove(opengl->sm_source[0]);
-		opengl->sm_source[0] = 0;
-	}
-	if (opengl->sm_source[1]) {
-		g_source_remove(opengl->sm_source[1]);
-		opengl->sm_source[1] = 0;
-	}
-	if (opengl->ue_source) {
-		g_source_remove(opengl->ue_source);
-		opengl->ue_source = 0;
-	}
 	G_OBJECT_CLASS(grits_opengl_parent_class)->dispose(_opengl);
 }
 static void grits_opengl_finalize(GObject *_opengl)

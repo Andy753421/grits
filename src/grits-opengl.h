@@ -42,8 +42,6 @@ struct _GritsOpenGL {
 	GMutex      objects_lock;
 	RoamSphere *sphere;
 	GMutex      sphere_lock;
-	guint       sm_source[2];
-	guint       ue_source;
 	GdkEventMotion mouse_queue;
 
 	/* for testing */

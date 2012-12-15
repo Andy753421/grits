@@ -701,10 +701,14 @@ void roam_sphere_update_view(RoamSphere *sphere)
 void roam_sphere_update_errors(RoamSphere *sphere)
 {
 	g_debug("RoamSphere: update_errors - polys=%d", sphere->polys);
+
+	static int version = 0;
+	if (version == sphere->view->version)
+		return;
+	version = sphere->view->version;
+
 	GPtrArray *tris = g_pqueue_get_array(sphere->triangles);
 	GPtrArray *dias = g_pqueue_get_array(sphere->diamonds);
-
-	roam_sphere_update_view(sphere);
 
 	for (int i = 0; i < tris->len; i++) {
 		RoamTriangle *triangle = tris->pdata[i];

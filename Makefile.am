@@ -16,7 +16,7 @@ release: all dist
 	git push --all
 	echo $(VERSION) > LATEST
 	scp LATEST $(PACKAGE)-$(VERSION).tar.* \
-		"andy@pileus.org:/home/pileus/htdocs/$(PACKAGE)"; \
+		"andy@pileus.org:/home/pileus/htdocs/$(PACKAGE)/files"; \
 	rm -f LATEST
 
 depscan:

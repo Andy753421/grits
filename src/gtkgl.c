@@ -56,6 +56,26 @@ void gtk_gl_disable(GtkWidget *widget)
 #elif defined(SYS_X11)
 #include <GL/glx.h>
 #include <gdk/gdkx.h>
+static gboolean gtk_gl_errors;
+static int gtk_gl_handler(Display *xdisplay, XErrorEvent *xerror)
+{
+	gtk_gl_errors = TRUE;
+	return 0;
+}
+static GLXContext gtk_gl_create_context(Display *xdisplay, XVisualInfo *xvinfo,
+		GLXContext shared, Bool direct)
+{
+	gtk_gl_errors = FALSE;
+	XSync(xdisplay, False);
+	void *handler = XSetErrorHandler(gtk_gl_handler);
+	GLXContext context = glXCreateContext(xdisplay, xvinfo, shared, direct);
+	XSync(xdisplay, False);
+	XSetErrorHandler(handler);
+
+	if (gtk_gl_errors)
+		return 0;
+	return context;
+}
 void gtk_gl_enable(GtkWidget *widget)
 {
 	g_debug("GtkGl: enable");
@@ -72,10 +92,20 @@ void gtk_gl_enable(GtkWidget *widget)
 	                 GLX_DOUBLEBUFFER,
 	                 GLX_DEPTH_SIZE,  1,
 	                 None};
+
 	XVisualInfo *xvinfo  = glXChooseVisual(xdisplay, nscreen, attribs);
 	if (!xvinfo)
 		g_error("GtkGl: enable - unable to get valid OpenGL Visual");
-	GLXContext   context = glXCreateContext(xdisplay, xvinfo, NULL, True);
+	GLXContext context = 0;
+	if (!context)
+		context = gtk_gl_create_context(xdisplay, xvinfo, NULL, True);
+	if (!context)
+		context = gtk_gl_create_context(xdisplay, xvinfo, NULL, False);
+	if (!context)
+		g_error("Unable to create OpenGL context,"
+		        "possible graphics driver problem?");
+	g_debug("GtkGl: direct rendering = %d\n", glXIsDirect(xdisplay, context));
+
 	g_object_set_data(G_OBJECT(widget), "glcontext", context);
 
 	/* Fix up colormap */

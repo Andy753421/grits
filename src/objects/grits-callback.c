@@ -60,6 +60,7 @@ G_DEFINE_TYPE(GritsCallback, grits_callback, GRITS_TYPE_OBJECT);
 static void grits_callback_finalize(GObject *cb)
 {
 	g_debug("GritsCallback: finalize");
+	G_OBJECT_CLASS(grits_callback_parent_class)->finalize(cb);
 }
 static void grits_callback_init(GritsCallback *cb)
 {

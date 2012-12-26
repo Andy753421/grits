@@ -565,7 +565,6 @@ void grits_viewer_add(GritsViewer *viewer, GritsObject *object,
  * @object: the object to remove
  *
  * Remove an object from the viewer.
- * The objects reference count is decremented.
  */
 void grits_viewer_remove(GritsViewer *viewer, GritsObject *object)
 {
@@ -576,7 +575,6 @@ void grits_viewer_remove(GritsViewer *viewer, GritsObject *object)
 		g_warning("GritsViewer: remove - Unimplemented");
 	object->viewer = NULL;
 	klass->remove(viewer, object);
-	g_object_unref(object);
 }
 
 /****************

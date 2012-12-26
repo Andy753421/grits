@@ -248,6 +248,7 @@ static void grits_plugin_map_dispose(GObject *gobject)
 		map->viewer = NULL;
 		g_signal_handler_disconnect(viewer, map->sigid);
 		grits_viewer_remove(viewer, GRITS_OBJECT(map->tiles));
+		g_object_unref(map->tiles);
 		soup_session_abort(map->tms->http->soup);
 		//soup_session_abort(map->wms->http->soup);
 		g_thread_pool_free(map->threads, TRUE, TRUE);

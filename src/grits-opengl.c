@@ -618,6 +618,7 @@ static void grits_opengl_add(GritsViewer *_opengl, GritsObject *object,
 		list->next->prev = link;
 	list->next = link;
 	object->ref = link;
+	g_object_ref(object);
 	g_mutex_unlock(&opengl->objects_lock);
 }
 
@@ -625,6 +626,8 @@ void grits_opengl_remove(GritsViewer *_opengl, GritsObject *object)
 {
 	g_assert(GRITS_IS_OPENGL(_opengl));
 	GritsOpenGL *opengl = GRITS_OPENGL(_opengl);
+	if (!object->ref)
+		return;
 	g_mutex_lock(&opengl->objects_lock);
 	GList *link = object->ref;
 	/* Just unlink and free it, link->prev is assured */
@@ -632,6 +635,8 @@ void grits_opengl_remove(GritsViewer *_opengl, GritsObject *object)
 	if (link->next)
 		link->next->prev = link->prev;
 	g_free(link);
+	object->ref = NULL;
+	g_object_unref(object);
 	g_mutex_unlock(&opengl->objects_lock);
 }
 

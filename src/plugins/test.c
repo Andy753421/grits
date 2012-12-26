@@ -180,6 +180,9 @@ static void grits_plugin_test_dispose(GObject *_test)
 		grits_viewer_remove(viewer, GRITS_OBJECT(test->marker));
 		grits_viewer_remove(viewer, GRITS_OBJECT(test->poly));
 		grits_viewer_remove(viewer, GRITS_OBJECT(test->line));
+		g_object_unref(test->marker);
+		g_object_unref(test->poly);
+		g_object_unref(test->line);
 		g_object_unref(viewer);
 	}
 	G_OBJECT_CLASS(grits_plugin_test_parent_class)->dispose(_test);

@@ -171,7 +171,7 @@ void grits_plugins_free(GritsPlugins *plugins)
 	g_debug("GritsPlugins: free");
 	for (GList *cur = plugins->plugins; cur; cur = cur->next) {
 		GritsPluginStore *store = cur->data;
-		g_debug("GritsPlugin: freeing %s refs=%d->%d", store->name,
+		g_debug("GritsPlugins: freeing %s refs=%d->%d", store->name,
 			G_OBJECT(store->plugin)->ref_count,
 			G_OBJECT(store->plugin)->ref_count-1);
 		grits_plugins_free_store(store);

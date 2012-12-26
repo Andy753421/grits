@@ -57,6 +57,10 @@ static gboolean _load_tile_cb(gpointer _data)
 {
 	struct _LoadTileData *data = _data;
 	g_debug("GritsPluginMap: _load_tile_cb start");
+	if (data->map->aborted) {
+		g_debug("GritsPluginMap: _load_tile - aborted");
+		return FALSE;
+	}
 
 	guint *tex = g_new0(guint, 1);
 	glGenTextures(1, tex);
@@ -73,7 +77,8 @@ static gboolean _load_tile_cb(gpointer _data)
 	glFlush();
 
 	data->tile->data = tex;
-	gtk_widget_queue_draw(GTK_WIDGET(data->map->viewer));
+	if (data->map->viewer)
+		gtk_widget_queue_draw(GTK_WIDGET(data->map->viewer));
 	g_free(data->pixels);
 	g_free(data);
 	return FALSE;

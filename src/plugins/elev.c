@@ -154,6 +154,10 @@ static gboolean _load_tile_cb(gpointer _data)
 	struct _LoadTileData *data  = _data;
 	struct _TileData     *tdata = data->tdata;
 	g_debug("GritsPluginElev: _load_tile_cb start");
+	if (data->elev->aborted) {
+		g_debug("GritsPluginElev: _load_tile - aborted");
+		return FALSE;
+	}
 
 	/* Load OpenGL texture (from main thread) */
 	if (data->pixels) {

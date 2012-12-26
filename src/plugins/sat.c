@@ -46,6 +46,10 @@ static gboolean _load_tile_cb(gpointer _data)
 {
 	struct _LoadTileData *data = _data;
 	g_debug("GritsPluginSat: _load_tile_cb start");
+	if (data->sat->aborted) {
+		g_debug("GritsPluginSat: _load_tile - aborted");
+		return FALSE;
+	}
 
 	guint *tex = g_new0(guint, 1);
 	glGenTextures(1, tex);

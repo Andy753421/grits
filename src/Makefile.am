@@ -89,12 +89,15 @@ BUILT_SOURCES += .libs/$(GRITS_SUBDIR)
 	ln -sf ../plugins/.libs $@
 
 test: all
+	G_MESSAGES_DEBUG=all \
 	./grits-test
 
 gdb: all
+	G_MESSAGES_DEBUG=all \
 	gdb ./.libs/grits-test
 
 ddd: all
+	G_MESSAGES_DEBUG=all \
 	ddd ./grits-test
 
 memcheck: all

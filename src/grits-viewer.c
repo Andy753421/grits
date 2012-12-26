@@ -548,37 +548,35 @@ void grits_viewer_set_height_func(GritsViewer *viewer, GritsBounds *bounds,
  *
  * The viewer steals the objects reference. Call g_object_ref if you plan on
  * holding a reference as well.
- *
- * Returns: a handle to be pass to grits_viewer_remove()
  */
-gpointer grits_viewer_add(GritsViewer *viewer, GritsObject *object,
+void grits_viewer_add(GritsViewer *viewer, GritsObject *object,
 		gint level, gboolean sort)
 {
 	GritsViewerClass *klass = GRITS_VIEWER_GET_CLASS(viewer);
 	if (!klass->add)
 		g_warning("GritsViewer: add - Unimplemented");
-	object->ref    = klass->add(viewer, object, level, sort);
 	object->viewer = viewer;
-	return object;
+	klass->add(viewer, object, level, sort);
 }
 
 /**
  * grits_viewer_remove:
  * @viewer: the viewer
- * @ref:    the handle obtained from grits_viewer_add()
+ * @object: the object to remove
  *
- * Remove an object from the viewer. The objects reference count is decremented
- * prior to being removed.
- *
- * Returns: the #GritsObject referenced by the handle
+ * Remove an object from the viewer.
+ * The objects reference count is decremented.
  */
-GritsObject *grits_viewer_remove(GritsViewer *viewer, GritsObject *object)
+void grits_viewer_remove(GritsViewer *viewer, GritsObject *object)
 {
 	GritsViewerClass *klass = GRITS_VIEWER_GET_CLASS(viewer);
+	if (!object->viewer)
+		return;
 	if (!klass->remove)
 		g_warning("GritsViewer: remove - Unimplemented");
+	object->viewer = NULL;
 	klass->remove(viewer, object);
-	return object;
+	g_object_unref(object);
 }
 
 /****************

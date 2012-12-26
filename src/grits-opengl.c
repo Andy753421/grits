@@ -593,7 +593,7 @@ static void _objects_free(gpointer value, gpointer _)
 	g_free(level);
 }
 
-static gpointer grits_opengl_add(GritsViewer *_opengl, GritsObject *object,
+static void grits_opengl_add(GritsViewer *_opengl, GritsObject *object,
 		gint num, gboolean sort)
 {
 	g_assert(GRITS_IS_OPENGL(_opengl));
@@ -617,26 +617,22 @@ static gpointer grits_opengl_add(GritsViewer *_opengl, GritsObject *object,
 	if (list->next)
 		list->next->prev = link;
 	list->next = link;
+	object->ref = link;
 	g_mutex_unlock(&opengl->objects_lock);
-	return link;
 }
 
-static GritsObject *grits_opengl_remove(GritsViewer *_opengl, GritsObject *object)
+void grits_opengl_remove(GritsViewer *_opengl, GritsObject *object)
 {
 	g_assert(GRITS_IS_OPENGL(_opengl));
 	GritsOpenGL *opengl = GRITS_OPENGL(_opengl);
-	GList *link = object->ref;
 	g_mutex_lock(&opengl->objects_lock);
+	GList *link = object->ref;
 	/* Just unlink and free it, link->prev is assured */
 	link->prev->next = link->next;
 	if (link->next)
 		link->next->prev = link->prev;
-	g_mutex_unlock(&opengl->objects_lock);
-	object->ref    = NULL;
-	object->viewer = NULL;
 	g_free(link);
-	g_object_unref(object);
-	return object;
+	g_mutex_unlock(&opengl->objects_lock);
 }
 
 /****************

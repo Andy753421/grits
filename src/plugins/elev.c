@@ -25,21 +25,28 @@
  * greyscale elevation overlay on the planets surface.
  */
 
+#include <time.h>
 #include <glib/gstdio.h>
 
 #include <grits.h>
 
 #include "elev.h"
 
+/* Configuration */
+#define LOAD_BIL       TRUE
+#define LOAD_TEX       FALSE
+
+/* Tile size constnats */
 #define MAX_RESOLUTION 50
 #define TILE_WIDTH     1024
 #define TILE_HEIGHT    512
+#define TILE_CHANNELS  4
 #define TILE_SIZE      (TILE_WIDTH*TILE_HEIGHT*sizeof(guint16))
 
 struct _TileData {
-	/* OpenGL has to be first to make grits_opengl_render_tiles happy */
-	guint      opengl;
-	guint16   *bil;
+	/* OpenGL has to be first to make grits_tile_draw happy */
+	guint    tex;
+	guint16 *bil;
 };
 
 static gdouble _height_func(gdouble lat, gdouble lon, gpointer _elev)
@@ -96,15 +103,14 @@ static gdouble _height_func(gdouble lat, gdouble lon, gpointer _elev)
 /**********************
  * Loader and Freeers *
  **********************/
-#define LOAD_BIL    TRUE
-#define LOAD_OPENGL FALSE
+
 struct _LoadTileData {
-	GritsPluginElev    *elev;
-	gchar            *path;
-	GritsTile          *tile;
-	GdkPixbuf        *pixbuf;
-	struct _TileData *data;
+	GritsPluginElev  *elev;
+	GritsTile        *tile;
+	guint8           *pixels;
+	struct _TileData *tdata;
 };
+
 static guint16 *_load_bil(gchar *path)
 {
 	gsize len;
@@ -119,110 +125,108 @@ static guint16 *_load_bil(gchar *path)
 	}
 	return (guint16*)data;
 }
-static GdkPixbuf *_load_pixbuf(guint16 *bil)
+
+static guchar *_load_pixels(guint16 *bil)
 {
-	GdkPixbuf *pixbuf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, TILE_WIDTH, TILE_HEIGHT);
-	guchar    *pixels = gdk_pixbuf_get_pixels(pixbuf);
-	gint       stride = gdk_pixbuf_get_rowstride(pixbuf);
-	gint       nchan  = gdk_pixbuf_get_n_channels(pixbuf);
+	g_assert(TILE_CHANNELS == 4);
+
+	guchar (*pixels)[TILE_WIDTH][TILE_CHANNELS]
+		= g_malloc0(TILE_HEIGHT * TILE_WIDTH * TILE_CHANNELS);
 
 	for (int r = 0; r < TILE_HEIGHT; r++) {
 		for (int c = 0; c < TILE_WIDTH; c++) {
 			gint16 value = bil[r*TILE_WIDTH + c];
-			//guchar color = (float)(MAX(value,0))/8848 * 255;
 			guchar color = (float)value/8848 * 255;
-			pixels[r*stride + c*nchan + 0] = color;
-			pixels[r*stride + c*nchan + 1] = color;
-			pixels[r*stride + c*nchan + 2] = color;
-			if (nchan == 4)
-				pixels[r*stride + c*nchan + 3] = 128;
+			//guchar color = (float)(MAX(value,0))/8848 * 255;
+			pixels[r][c][0] = color;
+			pixels[r][c][1] = color;
+			pixels[r][c][2] = color;
+			pixels[r][c][3] = 0xff;
 		}
 	}
-	g_debug("GritsPluginElev: load_pixbuf %p", pixbuf);
-	return pixbuf;
+
+	g_debug("GritsPluginElev: load_pixels %p", pixels);
+	return (guchar*)pixels;
 }
-static guint _load_opengl(GdkPixbuf *pixbuf)
+
+static gboolean _load_tile_cb(gpointer _data)
 {
-	/* Load image */
-	guchar *pixels = gdk_pixbuf_get_pixels(pixbuf);
-	gint    alpha  = gdk_pixbuf_get_has_alpha(pixbuf);
-	gint    nchan  = 4; // gdk_pixbuf_get_n_channels(pixbuf);
-	gint    width  = gdk_pixbuf_get_width(pixbuf);
-	gint    height = gdk_pixbuf_get_height(pixbuf);
+	struct _LoadTileData *data  = _data;
+	struct _TileData     *tdata = data->tdata;
+	g_debug("GritsPluginElev: _load_tile_cb start");
 
-	/* Create Texture */
-	guint opengl;
-	glGenTextures(1, &opengl);
-	glBindTexture(GL_TEXTURE_2D, opengl);
+	/* Load OpenGL texture (from main thread) */
+	if (data->pixels) {
+		glGenTextures(1, &tdata->tex);
+		glBindTexture(GL_TEXTURE_2D, tdata->tex);
 
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glPixelStorei(GL_PACK_ALIGNMENT, 1);
-	glTexImage2D(GL_TEXTURE_2D, 0, nchan, width, height, 0,
-			(alpha ? GL_RGBA : GL_RGB), GL_UNSIGNED_BYTE, pixels);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		glTexImage2D(GL_TEXTURE_2D, 0, TILE_CHANNELS, TILE_WIDTH, TILE_HEIGHT, 0,
+				GL_RGBA, GL_UNSIGNED_BYTE, data->pixels);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glFlush();
+	}
 
-	g_debug("GritsPluginElev: load_opengl %d", opengl);
-	return opengl;
-}
-static gboolean _load_tile_cb(gpointer _load)
-{
-	struct _LoadTileData *load = _load;
-	g_debug("GritsPluginElev: _load_tile_cb: %s", load->path);
-	GritsPluginElev    *elev   = load->elev;
-	GritsTile          *tile   = load->tile;
-	GdkPixbuf        *pixbuf = load->pixbuf;
-	struct _TileData *data   = load->data;
-	g_free(load->path);
-	g_free(load);
+	/* Set hight function (from main thread) */
+	if (tdata->bil) {
+		grits_viewer_set_height_func(data->elev->viewer, &data->tile->edge,
+				_height_func, data->elev, TRUE);
+	}
 
-	if (LOAD_OPENGL)
-		data->opengl = _load_opengl(pixbuf);
+	/* Queue tiles for drawing */
+	data->tile->data = tdata;
+	gtk_widget_queue_draw(GTK_WIDGET(data->elev->viewer));
 
-	tile->data = data;
-
-	/* Do necessasairy processing */
-	/* TODO: Lock this and move to thread, can remove elev from _load then */
-	if (LOAD_BIL)
-		grits_viewer_set_height_func(elev->viewer, &tile->edge,
-				_height_func, elev, TRUE);
-
-	/* Cleanup unneeded things */
-	if (!LOAD_BIL)
-		g_free(data->bil);
-	if (LOAD_OPENGL)
-		g_object_unref(pixbuf);
-
+	/* Cleanup */
+	g_free(data->pixels);
+	g_free(data);
 	return FALSE;
 }
+
 static void _load_tile(GritsTile *tile, gpointer _elev)
 {
 	GritsPluginElev *elev = _elev;
+	guint16 *bil    = NULL;
+	guchar  *pixels = NULL;
 
-	struct _LoadTileData *load = g_new0(struct _LoadTileData, 1);
-	load->path = grits_wms_fetch(elev->wms, tile, GRITS_ONCE, NULL, NULL);
-	if (!load->path) return; // Canceled/error
-	g_debug("GritsPluginElev: _load_tile: %s", load->path);
-	load->elev = elev;
-	load->tile = tile;
-	load->data = g_new0(struct _TileData, 1);
-	if (LOAD_BIL || LOAD_OPENGL) {
-		load->data->bil = _load_bil(load->path);
-		if (!load->data->bil) {
-			g_remove(load->path);
-			g_free(load->data);
-			g_free(load->path);
-			g_free(load);
-			return;
-		}
-	}
-	if (LOAD_OPENGL) {
-		load->pixbuf = _load_pixbuf(load->data->bil);
+	g_debug("GritsPluginElev: _load_tile start %p", g_thread_self());
+	if (elev->aborted) {
+		g_debug("GritsPluginElev: _load_tile - aborted");
+		return;
 	}
 
-	g_idle_add_full(G_PRIORITY_LOW, _load_tile_cb, load, NULL);
+	/* Download tile */
+	gchar *path = grits_wms_fetch(elev->wms, tile, GRITS_ONCE, NULL, NULL);
+	if (!path) return;
+
+	/* Load bil */
+	bil = _load_bil(path);
+	g_free(path);
+	if (!bil) return;
+
+	/* Load pixels */
+	if (LOAD_TEX)
+		pixels = _load_pixels(bil);
+	if (!LOAD_BIL)
+		g_free(bil);
+
+	/* Copy pixbuf data for callback */
+	struct _LoadTileData *data  = g_new0(struct _LoadTileData, 1);
+	struct _TileData     *tdata = g_new0(struct _TileData,     1);
+	data->elev   = elev;
+	data->tile   = tile;
+	data->pixels = pixels;
+	data->tdata  = tdata;
+	tdata->tex   = 0;
+	tdata->bil   = bil;
+
+	/* Load the GL texture from the main thread */
+	g_idle_add_full(G_PRIORITY_LOW, _load_tile_cb, data, NULL);
+	g_debug("GritsPluginElev: _load_tile end %p", g_thread_self());
 }
 
 static gboolean _free_tile_cb(gpointer _data)
@@ -230,8 +234,8 @@ static gboolean _free_tile_cb(gpointer _data)
 	struct _TileData *data = _data;
 	if (LOAD_BIL)
 		g_free(data->bil);
-	if (LOAD_OPENGL)
-		glDeleteTextures(1, &data->opengl);
+	if (LOAD_TEX)
+		glDeleteTextures(1, &data->tex);
 	g_free(data);
 	return FALSE;
 }
@@ -242,11 +246,10 @@ static void _free_tile(GritsTile *tile, gpointer _elev)
 		g_idle_add_full(G_PRIORITY_LOW, _free_tile_cb, tile->data, NULL);
 }
 
-static gpointer _update_tiles(gpointer _elev)
+static void _update_tiles(gpointer _, gpointer _elev)
 {
+	g_debug("GritsPluginElev: _update_tiles");
 	GritsPluginElev *elev = _elev;
-	if (!g_mutex_trylock(&elev->mutex))
-		return NULL;
 	GritsPoint eye;
 	grits_viewer_get_location(elev->viewer, &eye.lat, &eye.lon, &eye.elev);
 	grits_tile_update(elev->tiles, &eye,
@@ -254,8 +257,6 @@ static gpointer _update_tiles(gpointer _elev)
 			_load_tile, elev);
 	grits_tile_gc(elev->tiles, time(NULL)-10,
 			_free_tile, elev);
-	g_mutex_unlock(&elev->mutex);
-	return NULL;
 }
 
 /*************
@@ -264,14 +265,7 @@ static gpointer _update_tiles(gpointer _elev)
 static void _on_location_changed(GritsViewer *viewer,
 		gdouble lat, gdouble lon, gdouble elevation, GritsPluginElev *elev)
 {
-	g_thread_new("update-tiles-thread", _update_tiles, elev);
-}
-
-static gpointer _threaded_init(GritsPluginElev *elev)
-{
-	_load_tile(elev->tiles, elev);
-	_update_tiles(elev);
-	return NULL;
+	g_thread_pool_push(elev->threads, NULL+1, NULL);
 }
 
 /***********
@@ -292,14 +286,15 @@ GritsPluginElev *grits_plugin_elev_new(GritsViewer *viewer)
 	elev->viewer = g_object_ref(viewer);
 
 	/* Load initial tiles */
-	g_thread_new("init-thread", (GThreadFunc)_threaded_init, elev);
+	_load_tile(elev->tiles, elev);
+	_update_tiles(NULL, elev);
 
 	/* Connect signals */
 	elev->sigid = g_signal_connect(elev->viewer, "location-changed",
 			G_CALLBACK(_on_location_changed), elev);
 
 	/* Add renderers */
-	if (LOAD_OPENGL)
+	if (LOAD_TEX)
 		grits_viewer_add(viewer, GRITS_OBJECT(elev->tiles), GRITS_LEVEL_WORLD, FALSE);
 
 	return elev;
@@ -324,25 +319,32 @@ static void grits_plugin_elev_init(GritsPluginElev *elev)
 {
 	g_debug("GritsPluginElev: init");
 	/* Set defaults */
-	g_mutex_init(&elev->mutex);
+	elev->threads = g_thread_pool_new(_update_tiles, elev, 1, FALSE, NULL);
 	elev->tiles = grits_tile_new(NULL, NORTH, SOUTH, EAST, WEST);
 	elev->wms   = grits_wms_new(
 		"http://www.nasa.network.com/elev", "mergedSrtm", "application/bil",
 		"srtm/", "bil", TILE_WIDTH, TILE_HEIGHT);
+	g_object_ref(elev->tiles);
 }
 static void grits_plugin_elev_dispose(GObject *gobject)
 {
 	g_debug("GritsPluginElev: dispose");
 	GritsPluginElev *elev = GRITS_PLUGIN_ELEV(gobject);
+	elev->aborted = TRUE;
 	/* Drop references */
 	if (elev->viewer) {
-		if (LOAD_BIL)
-			grits_viewer_clear_height_func(elev->viewer);
-		if (LOAD_OPENGL)
-			grits_viewer_remove(elev->viewer, GRITS_OBJECT(elev->tiles));
-		g_signal_handler_disconnect(elev->viewer, elev->sigid);
-		g_object_unref(elev->viewer);
+		GritsViewer *viewer = elev->viewer;
 		elev->viewer = NULL;
+		g_signal_handler_disconnect(viewer, elev->sigid);
+		if (LOAD_BIL)
+			grits_viewer_clear_height_func(viewer);
+		if (LOAD_TEX)
+			grits_viewer_remove(viewer, GRITS_OBJECT(elev->tiles));
+		soup_session_abort(elev->wms->http->soup);
+		g_thread_pool_free(elev->threads, TRUE, TRUE);
+		while (gtk_events_pending())
+			gtk_main_iteration();
+		g_object_unref(viewer);
 	}
 	G_OBJECT_CLASS(grits_plugin_elev_parent_class)->dispose(gobject);
 }
@@ -351,11 +353,8 @@ static void grits_plugin_elev_finalize(GObject *gobject)
 	g_debug("GritsPluginElev: finalize");
 	GritsPluginElev *elev = GRITS_PLUGIN_ELEV(gobject);
 	/* Free data */
-	grits_tile_free(elev->tiles, _free_tile, elev);
 	grits_wms_free(elev->wms);
-	g_mutex_lock(&elev->mutex);
-	g_mutex_unlock(&elev->mutex);
-	g_mutex_clear(&elev->mutex);
+	grits_tile_free(elev->tiles, _free_tile, elev);
 	G_OBJECT_CLASS(grits_plugin_elev_parent_class)->finalize(gobject);
 
 }

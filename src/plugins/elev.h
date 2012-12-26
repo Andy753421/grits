@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Andy Spencer <andy753421@gmail.com>
+ * Copyright (C) 2009-2012 Andy Spencer <andy753421@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,8 +37,9 @@ struct _GritsPluginElev {
 	GritsViewer *viewer;
 	GritsTile   *tiles;
 	GritsWms    *wms;
-	GMutex       mutex;
+	GThreadPool *threads;
 	gulong       sigid;
+	gboolean     aborted;
 };
 
 struct _GritsPluginElevClass {

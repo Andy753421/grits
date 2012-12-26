@@ -112,6 +112,8 @@ void gtk_gl_enable(GtkWidget *widget)
 	GdkVisual   *visual = gdk_x11_screen_lookup_visual(screen, xvinfo->visualid);
 	GdkColormap *cmap   = gdk_colormap_new(visual, FALSE);
 	gtk_widget_set_colormap(widget, cmap);
+	g_object_unref(cmap);
+	XFree(xvinfo);
 
 	/* Disable GTK double buffering */
 	gtk_widget_set_double_buffered(widget, FALSE);

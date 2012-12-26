@@ -587,9 +587,9 @@ static void _objects_free(gpointer value, gpointer _)
 {
 	struct RenderLevel *level = value;
 	if (level->sorted.next)
-		g_list_free(level->sorted.next);
+		g_list_free_full(level->sorted.next, g_object_unref);
 	if (level->unsorted.next)
-		g_list_free(level->unsorted.next);
+		g_list_free_full(level->unsorted.next, g_object_unref);
 	g_free(level);
 }
 
@@ -657,6 +657,15 @@ static void grits_opengl_init(GritsOpenGL *opengl)
 static void grits_opengl_dispose(GObject *_opengl)
 {
 	g_debug("GritsOpenGL: dispose");
+	GritsOpenGL *opengl = GRITS_OPENGL(_opengl);
+	if (opengl->objects) {
+		GQueue *objects = opengl->objects;;
+		opengl->objects = NULL;
+		g_mutex_lock(&opengl->objects_lock);
+		g_queue_foreach(objects, _objects_free, NULL);
+		g_queue_free(objects);
+		g_mutex_unlock(&opengl->objects_lock);
+	}
 	G_OBJECT_CLASS(grits_opengl_parent_class)->dispose(_opengl);
 }
 static void grits_opengl_finalize(GObject *_opengl)
@@ -664,10 +673,9 @@ static void grits_opengl_finalize(GObject *_opengl)
 	g_debug("GritsOpenGL: finalize");
 	GritsOpenGL *opengl = GRITS_OPENGL(_opengl);
 	roam_sphere_free(opengl->sphere);
-	g_queue_foreach(opengl->objects, _objects_free, NULL);
-	g_queue_free(opengl->objects);
 	g_mutex_clear(&opengl->objects_lock);
 	g_mutex_clear(&opengl->sphere_lock);
+	gtk_gl_disable(GTK_WIDGET(opengl));
 	G_OBJECT_CLASS(grits_opengl_parent_class)->finalize(_opengl);
 }
 static void grits_opengl_class_init(GritsOpenGLClass *klass)

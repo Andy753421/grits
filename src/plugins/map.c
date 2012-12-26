@@ -189,7 +189,6 @@ GritsPluginMap *grits_plugin_map_new(GritsViewer *viewer)
 	map->viewer = g_object_ref(viewer);
 
 	/* Load initial tiles */
-	_load_tile(map->tiles, map);
 	_update_tiles(NULL, map);
 
 	/* Connect signals */

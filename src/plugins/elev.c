@@ -286,7 +286,6 @@ GritsPluginElev *grits_plugin_elev_new(GritsViewer *viewer)
 	elev->viewer = g_object_ref(viewer);
 
 	/* Load initial tiles */
-	_load_tile(elev->tiles, elev);
 	_update_tiles(NULL, elev);
 
 	/* Connect signals */
@@ -340,6 +339,8 @@ static void grits_plugin_elev_dispose(GObject *gobject)
 			grits_viewer_clear_height_func(viewer);
 		if (LOAD_TEX)
 			grits_viewer_remove(viewer, GRITS_OBJECT(elev->tiles));
+		else
+			g_object_unref(elev->tiles);
 		soup_session_abort(elev->wms->http->soup);
 		g_thread_pool_free(elev->threads, TRUE, TRUE);
 		while (gtk_events_pending())

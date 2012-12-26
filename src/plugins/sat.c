@@ -173,7 +173,6 @@ GritsPluginSat *grits_plugin_sat_new(GritsViewer *viewer)
 	sat->viewer = g_object_ref(viewer);
 
 	/* Load initial tiles */
-	_load_tile(sat->tiles, sat);
 	_update_tiles(NULL, sat);
 
 	/* Connect signals */

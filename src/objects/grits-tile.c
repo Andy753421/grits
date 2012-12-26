@@ -39,7 +39,7 @@
 #include "gtkgl.h"
 #include "grits-tile.h"
 
-guint  grits_tile_mask = 0;
+static guint  grits_tile_mask = 0;
 
 gchar *grits_tile_path_table[2][2] = {
 	{"00.", "01."},
@@ -364,6 +364,7 @@ static guint _grits_tile_load_mask(void)
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	g_free(bytes);
 	return tex;
 }
 

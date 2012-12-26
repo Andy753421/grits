@@ -378,6 +378,7 @@ static void grits_plugin_env_dispose(GObject *gobject)
 			grits_viewer_remove(env->viewer, cur->data);
 		g_list_free(env->refs);
 		g_object_unref(env->viewer);
+		g_object_unref(env->prefs);
 		glDeleteTextures(1, &env->tex);
 		env->viewer = NULL;
 	}

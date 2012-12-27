@@ -290,7 +290,7 @@ static gboolean run_mouse_move(GritsOpenGL *opengl, GdkEventMotion *event)
 static gboolean on_motion_notify(GritsOpenGL *opengl, GdkEventMotion *event, gpointer _)
 {
 	opengl->mouse_queue = *event;
-	gtk_widget_queue_draw(GTK_WIDGET(opengl));
+	grits_viewer_queue_draw(GRITS_VIEWER(opengl));
 	return FALSE;
 }
 
@@ -402,18 +402,18 @@ static gboolean on_key_press(GritsOpenGL *opengl, GdkEventKey *event, gpointer _
 	/* Testing */
 	if (kv == GDK_w) {
 		opengl->wireframe = !opengl->wireframe;
-		gtk_widget_queue_draw(GTK_WIDGET(opengl));
+		grits_viewer_queue_draw(GRITS_VIEWER(opengl));
 	}
 	if (kv == GDK_p) {
 		opengl->pickmode = !opengl->pickmode;
-		gtk_widget_queue_draw(GTK_WIDGET(opengl));
+		grits_viewer_queue_draw(GRITS_VIEWER(opengl));
 	}
 #ifdef ROAM_DEBUG
 	else if (kv == GDK_n) roam_sphere_split_one(opengl->sphere);
 	else if (kv == GDK_p) roam_sphere_merge_one(opengl->sphere);
 	else if (kv == GDK_r) roam_sphere_split_merge(opengl->sphere);
 	else if (kv == GDK_u) roam_sphere_update_errors(opengl->sphere);
-	gtk_widget_queue_draw(GTK_WIDGET(opengl));
+	grits_viewer_queue_draw(GRITS_VIEWER(opengl));
 #endif
 	return FALSE;
 }

@@ -71,6 +71,14 @@ static void _grits_viewer_fix_rotation(GritsViewer *viewer)
 	while (viewer->rotation[2] >  180) viewer->rotation[2] -= 360;
 }
 
+static gboolean _grits_viewer_queue_draw_cb(gpointer _viewer)
+{
+	GritsViewer *viewer = _viewer;
+	gtk_widget_queue_draw(GTK_WIDGET(viewer));
+	viewer->draw_source = 0;
+	return FALSE;
+}
+
 /* Signal helpers */
 static void _grits_viewer_emit_location_changed(GritsViewer *viewer)
 {
@@ -187,7 +195,7 @@ static gboolean on_motion_notify(GritsViewer *viewer, GdkEventMotion *event, gpo
 static void on_view_changed(GritsViewer *viewer,
 		gdouble _1, gdouble _2, gdouble _3)
 {
-	gtk_widget_queue_draw(GTK_WIDGET(viewer));
+	grits_viewer_queue_draw(viewer);
 }
 
 /***********
@@ -424,6 +432,20 @@ gboolean grits_viewer_get_offline(GritsViewer *viewer)
 	return viewer->offline;
 }
 
+/**
+ * grits_viewer_queue_draw:
+ * @viewer: the viewer
+ *
+ * Causes the viewer to redraw the screen. This has the safe effect as
+ * gtk_widget_queue_draw, but is thread safe, and probably faster.
+ */
+void grits_viewer_queue_draw(GritsViewer *viewer)
+{
+	if (!viewer->draw_source)
+		viewer->draw_source = g_idle_add_full(G_PRIORITY_HIGH,
+				_grits_viewer_queue_draw_cb, viewer, NULL);
+}
+
 /***********************************
  * To be implemented by subclasses *
  ***********************************/
@@ -610,6 +632,14 @@ static void grits_viewer_init(GritsViewer *viewer)
 	g_signal_connect(viewer, "location-changed",     G_CALLBACK(on_view_changed),   NULL);
 	g_signal_connect(viewer, "rotation-changed",     G_CALLBACK(on_view_changed),   NULL);
 }
+static void grits_viewer_dispose(GObject *gobject)
+{
+	g_debug("GritsViewer: dispose");
+	GritsViewer *viewer = GRITS_VIEWER(gobject);
+	if (viewer->draw_source)
+		g_source_remove(viewer->draw_source);
+	G_OBJECT_CLASS(grits_viewer_parent_class)->dispose(gobject);
+}
 static void grits_viewer_finalize(GObject *gobject)
 {
 	g_debug("GritsViewer: finalize");
@@ -620,6 +650,7 @@ static void grits_viewer_class_init(GritsViewerClass *klass)
 {
 	g_debug("GritsViewer: class_init");
 	GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
+	gobject_class->dispose      = grits_viewer_dispose;
 	gobject_class->finalize     = grits_viewer_finalize;
 
 	/**

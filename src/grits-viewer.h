@@ -119,6 +119,9 @@ struct _GritsViewer {
 	/* For dragging */
 	gint    drag_mode;
 	gdouble drag_x, drag_y;
+
+	/* For queue_draw */
+	guint   draw_source;
 };
 
 struct _GritsViewerClass {
@@ -186,5 +189,7 @@ void grits_viewer_set_height_func(GritsViewer *viewer, GritsBounds *bounds,
 void grits_viewer_add(GritsViewer *viewer, GritsObject *object,
 		gint level, gboolean sort);
 void grits_viewer_remove(GritsViewer *viewer, GritsObject *object);
+
+void grits_viewer_queue_draw(GritsViewer *viewer);
 
 #endif

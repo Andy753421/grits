@@ -163,7 +163,7 @@ void grits_object_hide(GritsObject *object, gboolean hidden)
 void grits_object_queue_draw(GritsObject *object)
 {
 	if (object->viewer)
-		gtk_widget_queue_draw(GTK_WIDGET(object->viewer));
+		grits_viewer_queue_draw(object->viewer);
 }
 
 void grits_object_set_cursor(GritsObject *object, GdkCursorType cursor)

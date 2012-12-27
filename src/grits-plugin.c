@@ -347,6 +347,7 @@ gboolean grits_plugins_unload(GritsPlugins *plugins, const char *name)
 		if (g_str_equal(store->name, name)) {
 			plugins->plugins = g_list_delete_link(plugins->plugins, cur);
 			grits_plugins_free_store(store);
+			break;
 		}
 	}
 	return FALSE;

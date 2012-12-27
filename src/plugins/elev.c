@@ -133,13 +133,15 @@ static guchar *_load_pixels(guint16 *bil)
 	return (guchar*)pixels;
 }
 
-static void _load_tile(GritsTile *tile, gpointer _elev)
+static void _load_tile_thread(gpointer _tile, gpointer _elev)
 {
+	GritsTile       *tile = _tile;
 	GritsPluginElev *elev = _elev;
 
-	g_debug("GritsPluginElev: _load_tile start %p", g_thread_self());
+	g_debug("GritsPluginElev: _load_tile_thread start %p - tile=%p",
+			g_thread_self(), tile);
 	if (elev->aborted) {
-		g_debug("GritsPluginElev: _load_tile - aborted");
+		g_debug("GritsPluginElev: _load_tile_thread - aborted");
 		return;
 	}
 
@@ -173,19 +175,14 @@ static void _load_tile(GritsTile *tile, gpointer _elev)
 		g_free(bil);
 
 	/* Load the GL texture from the main thread */
-	g_debug("GritsPluginElev: _load_tile end %p", g_thread_self());
+	g_debug("GritsPluginElev: _load_tile_thread end %p", g_thread_self());
 }
 
-static void _update_tiles(gpointer _, gpointer _elev)
+static void _load_tile_func(GritsTile *tile, gpointer _elev)
 {
-	g_debug("GritsPluginElev: _update_tiles");
+	g_debug("GritsPluginElev: _load_tile_func - tile=%p", tile);
 	GritsPluginElev *elev = _elev;
-	GritsPoint eye;
-	grits_viewer_get_location(elev->viewer, &eye.lat, &eye.lon, &eye.elev);
-	grits_tile_update(elev->tiles, &eye,
-			MAX_RESOLUTION, TILE_WIDTH, TILE_WIDTH,
-			_load_tile, elev);
-	grits_tile_gc(elev->tiles, time(NULL)-10, NULL, elev);
+	g_thread_pool_push(elev->threads, tile, NULL);
 }
 
 /*************
@@ -194,7 +191,11 @@ static void _update_tiles(gpointer _, gpointer _elev)
 static void _on_location_changed(GritsViewer *viewer,
 		gdouble lat, gdouble lon, gdouble elevation, GritsPluginElev *elev)
 {
-	g_thread_pool_push(elev->threads, NULL+1, NULL);
+	GritsPoint eye = {lat, lon, elevation};
+	grits_tile_update(elev->tiles, &eye,
+			MAX_RESOLUTION, TILE_WIDTH, TILE_WIDTH,
+			_load_tile_func, elev);
+	grits_tile_gc(elev->tiles, time(NULL)-10, NULL, elev);
 }
 
 /***********
@@ -215,7 +216,9 @@ GritsPluginElev *grits_plugin_elev_new(GritsViewer *viewer)
 	elev->viewer = g_object_ref(viewer);
 
 	/* Load initial tiles */
-	_update_tiles(NULL, elev);
+	gdouble lat, lon, elevation;
+	grits_viewer_get_location(viewer, &lat, &lon, &elevation);
+	_on_location_changed(viewer, lat, lon, elevation, elev);
 
 	/* Connect signals */
 	elev->sigid = g_signal_connect(elev->viewer, "location-changed",
@@ -247,7 +250,7 @@ static void grits_plugin_elev_init(GritsPluginElev *elev)
 {
 	g_debug("GritsPluginElev: init");
 	/* Set defaults */
-	elev->threads = g_thread_pool_new(_update_tiles, elev, 1, FALSE, NULL);
+	elev->threads = g_thread_pool_new(_load_tile_thread, elev, 1, FALSE, NULL);
 	elev->tiles = grits_tile_new(NULL, NORTH, SOUTH, EAST, WEST);
 	elev->wms   = grits_wms_new(
 		"http://www.nasa.network.com/elev", "mergedSrtm", "application/bil",
@@ -262,15 +265,15 @@ static void grits_plugin_elev_dispose(GObject *gobject)
 	/* Drop references */
 	if (elev->viewer) {
 		GritsViewer *viewer = elev->viewer;
-		elev->viewer = NULL;
 		g_signal_handler_disconnect(viewer, elev->sigid);
+		soup_session_abort(elev->wms->http->soup);
+		g_thread_pool_free(elev->threads, TRUE, TRUE);
+		elev->viewer = NULL;
 		if (LOAD_BIL)
 			grits_viewer_clear_height_func(viewer);
 		if (LOAD_TEX)
 			grits_viewer_remove(viewer, GRITS_OBJECT(elev->tiles));
 		g_object_unref(elev->tiles);
-		soup_session_abort(elev->wms->http->soup);
-		g_thread_pool_free(elev->threads, TRUE, TRUE);
 		g_object_unref(viewer);
 	}
 	G_OBJECT_CLASS(grits_plugin_elev_parent_class)->dispose(gobject);

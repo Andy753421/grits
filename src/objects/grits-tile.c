@@ -224,7 +224,7 @@ void grits_tile_update(GritsTile *tile, GritsPoint *eye,
 	}
 
 	/* Load the tile */
-	if (!tile->load && !tile->pixels && !tile->tex)
+	if (!tile->load && !tile->data && !tile->tex && !tile->pixels && !tile->pixbuf)
 		load_func(tile, user_data);
 	tile->atime = time(NULL);
 	tile->load  = TRUE;
@@ -299,7 +299,6 @@ gboolean grits_tile_load_pixbuf(GritsTile *tile, GdkPixbuf *pixbuf)
 	tile->width  = gdk_pixbuf_get_width(pixbuf);
 	tile->height = gdk_pixbuf_get_height(pixbuf);
 	tile->alpha  = gdk_pixbuf_get_has_alpha(pixbuf);
-	tile->pixels = gdk_pixbuf_get_pixels(pixbuf);
 
 	/* Queue OpenGL texture load/draw */
 	grits_object_queue_draw(GRITS_OBJECT(tile));
@@ -321,17 +320,13 @@ gboolean grits_tile_load_file(GritsTile *tile, const gchar *file)
 {
 	g_debug("GritsTile: load_file %p -> %s", tile, file);
 
-	/* Load pixbuf */
-	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(file, NULL);
-	if (!pixbuf)
-		return FALSE;
-
 	/* Copy pixbuf data for callback */
-	tile->pixbuf = pixbuf;
-	tile->width  = gdk_pixbuf_get_width(pixbuf);
-	tile->height = gdk_pixbuf_get_height(pixbuf);
-	tile->alpha  = gdk_pixbuf_get_has_alpha(pixbuf);
-	tile->pixels = gdk_pixbuf_get_pixels(pixbuf);
+	tile->pixbuf = gdk_pixbuf_new_from_file(file, NULL);
+	if (!tile->pixbuf)
+		return FALSE;
+	tile->width  = gdk_pixbuf_get_width(tile->pixbuf);
+	tile->height = gdk_pixbuf_get_height(tile->pixbuf);
+	tile->alpha  = gdk_pixbuf_get_has_alpha(tile->pixbuf);
 
 	/* Queue OpenGL texture load/draw */
 	grits_object_queue_draw(GRITS_OBJECT(tile));
@@ -407,19 +402,20 @@ GritsTile *grits_tile_gc(GritsTile *root, time_t atime,
 	}
 	//g_debug("GritsTile: gc - %p kids=%d time=%d data=%d load=%d",
 	//	root, !!has_children, root->atime < atime, !!root->data, !!root->load);
-	if (root->parent && !has_children && root->atime < atime &&
-			(root->data || !root->load)) {
+	int thread_safe = !root->load || root->data || root->tex || root->pixels || root->pixbuf;
+	if (root->parent && !has_children && root->atime < atime && thread_safe) {
 		//g_debug("GritsTile: gc/free - %p", root);
-		if (root->tex) {
+		if (root->pixbuf)
+			g_object_unref(root->pixbuf);
+		if (root->pixels)
+			g_free(root->pixels);
+		if (root->tex)
 			glDeleteTextures(1, &root->tex);
-			root->tex = 0;
-		}
 		if (root->data) {
 			if (free_func)
 				free_func(root, user_data);
 			else
 				g_free(root->data);
-			root->data = NULL;
 		}
 		g_object_unref(root);
 		return NULL;
@@ -486,8 +482,12 @@ static gboolean _grits_tile_load_tex(GritsTile *tile)
 		return TRUE;
 
 	/* Check if the tile has data yet */
-	if (!tile->pixels)
+	if (!tile->pixels && !tile->pixbuf)
 		return FALSE;
+
+	/* Get correct pixel buffer */
+	guchar *pixels = tile->pixels ?:
+		gdk_pixbuf_get_pixels(tile->pixbuf);
 
 	/* Create texture */
 	g_debug("GritsTile: load_tex");
@@ -497,19 +497,21 @@ static gboolean _grits_tile_load_tex(GritsTile *tile)
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glPixelStorei(GL_PACK_ALIGNMENT, 1);
 	glTexImage2D(GL_TEXTURE_2D, 0, 4, tile->width, tile->height, 0,
-			(tile->alpha ? GL_RGBA : GL_RGB), GL_UNSIGNED_BYTE, tile->pixels);
+			(tile->alpha ? GL_RGBA : GL_RGB), GL_UNSIGNED_BYTE, pixels);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	/* Free data */
-	if (tile->pixbuf)
+	if (tile->pixbuf) {
 		g_object_unref(tile->pixbuf);
-	else
+		tile->pixbuf = NULL;
+	}
+	if (tile->pixels) {
 		g_free(tile->pixels);
-	tile->pixbuf = NULL;
-	tile->pixels = NULL;
+		tile->pixels = NULL;
+	}
 
 	return TRUE;
 

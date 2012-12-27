@@ -371,8 +371,10 @@ static gboolean on_expose(GritsOpenGL *opengl, GdkEventExpose *event, gpointer _
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 #ifndef ROAM_DEBUG
+	g_mutex_lock(&opengl->sphere_lock);
 	roam_sphere_update_errors(opengl->sphere);
 	roam_sphere_split_merge(opengl->sphere);
+	g_mutex_unlock(&opengl->sphere_lock);
 #endif
 
 #ifdef ROAM_DEBUG

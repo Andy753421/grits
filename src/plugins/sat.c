@@ -35,12 +35,15 @@
 #define TILE_WIDTH     1024
 #define TILE_HEIGHT    512
 
-static void _load_tile(GritsTile *tile, gpointer _sat)
+static void _load_tile_thread(gpointer _tile, gpointer _sat)
 {
-	GritsPluginSat *sat = _sat;
-	g_debug("GritsPluginSat: _load_tile start %p", g_thread_self());
+	GritsTile      *tile = _tile;
+	GritsPluginSat *sat  = _sat;
+
+	g_debug("GritsPluginSat: _load_tile_thread start %p - tile=%p",
+			g_thread_self(), tile);
 	if (sat->aborted) {
-		g_debug("GritsPluginSat: _load_tile - aborted");
+		g_debug("GritsPluginSat: _load_tile_thread - aborted");
 		return;
 	}
 
@@ -51,7 +54,7 @@ static void _load_tile(GritsTile *tile, gpointer _sat)
 	/* Load pixbuf */
 	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(path, NULL);
 	if (!pixbuf) {
-		g_warning("GritsPluginSat: _load_tile - Error loading pixbuf %s", path);
+		g_warning("GritsPluginSat: _load_tile_thread - Error loading pixbuf %s", path);
 		g_remove(path);
 		g_free(path);
 		return;
@@ -77,19 +80,14 @@ static void _load_tile(GritsTile *tile, gpointer _sat)
 
 	/* Load the GL texture from the main thread */
 	grits_tile_load_pixbuf(tile, pixbuf);
-	g_debug("GritsPluginSat: _load_tile end %p", g_thread_self());
+	g_debug("GritsPluginSat: _load_tile_thread end %p", g_thread_self());
 }
 
-static void _update_tiles(gpointer _, gpointer _sat)
+static void _load_tile_func(GritsTile *tile, gpointer _sat)
 {
-	g_debug("GritsPluginSat: _update_tiles");
+	g_debug("GritsPluginSat: __load_tile_func - tile=%p", tile);
 	GritsPluginSat *sat = _sat;
-	GritsPoint eye;
-	grits_viewer_get_location(sat->viewer, &eye.lat, &eye.lon, &eye.elev);
-	grits_tile_update(sat->tiles, &eye,
-			MAX_RESOLUTION, TILE_WIDTH, TILE_WIDTH,
-			_load_tile, sat);
-	grits_tile_gc(sat->tiles, time(NULL)-10, NULL, sat);
+	g_thread_pool_push(sat->threads, tile, NULL);
 }
 
 /*************
@@ -98,7 +96,11 @@ static void _update_tiles(gpointer _, gpointer _sat)
 static void _on_location_changed(GritsViewer *viewer,
 		gdouble lat, gdouble lon, gdouble elev, GritsPluginSat *sat)
 {
-	g_thread_pool_push(sat->threads, NULL+1, NULL);
+	GritsPoint eye = {lat, lon, elev};
+	grits_tile_update(sat->tiles, &eye,
+			MAX_RESOLUTION, TILE_WIDTH, TILE_WIDTH,
+			_load_tile_func, sat);
+	grits_tile_gc(sat->tiles, time(NULL)-10, NULL, sat);
 }
 
 /***********
@@ -119,7 +121,9 @@ GritsPluginSat *grits_plugin_sat_new(GritsViewer *viewer)
 	sat->viewer = g_object_ref(viewer);
 
 	/* Load initial tiles */
-	_update_tiles(NULL, sat);
+	gdouble lat, lon, elev;
+	grits_viewer_get_location(viewer, &lat, &lon, &elev);
+	_on_location_changed(viewer, lat, lon, elev, sat);
 
 	/* Connect signals */
 	sat->sigid = g_signal_connect(sat->viewer, "location-changed",
@@ -150,7 +154,7 @@ static void grits_plugin_sat_init(GritsPluginSat *sat)
 {
 	g_debug("GritsPluginSat: init");
 	/* Set defaults */
-	sat->threads = g_thread_pool_new(_update_tiles, sat, 1, FALSE, NULL);
+	sat->threads = g_thread_pool_new(_load_tile_thread, sat, 1, FALSE, NULL);
 	sat->tiles = grits_tile_new(NULL, NORTH, SOUTH, EAST, WEST);
 	sat->wms   = grits_wms_new(
 		"http://www.nasa.network.com/wms", "bmng200406", "image/jpeg",
@@ -165,12 +169,12 @@ static void grits_plugin_sat_dispose(GObject *gobject)
 	/* Drop references */
 	if (sat->viewer) {
 		GritsViewer *viewer = sat->viewer;
-		sat->viewer = NULL;
 		g_signal_handler_disconnect(viewer, sat->sigid);
-		grits_viewer_remove(viewer, GRITS_OBJECT(sat->tiles));
-		g_object_unref(sat->tiles);
 		soup_session_abort(sat->wms->http->soup);
 		g_thread_pool_free(sat->threads, TRUE, TRUE);
+		sat->viewer = NULL;
+		grits_viewer_remove(viewer, GRITS_OBJECT(sat->tiles));
+		g_object_unref(sat->tiles);
 		g_object_unref(viewer);
 	}
 	G_OBJECT_CLASS(grits_plugin_sat_parent_class)->dispose(gobject);

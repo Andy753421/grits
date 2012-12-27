@@ -46,12 +46,15 @@ static const guchar colormap[][2][4] = {
 	{{0xff, 0xe1, 0x80}, {0xff, 0xe1, 0x80, 0x60}}, // Cities
 };
 
-static void _load_tile(GritsTile *tile, gpointer _map)
+static void _load_tile_thread(gpointer _tile, gpointer _map)
 {
-	GritsPluginMap *map = _map;
-	g_debug("GritsPluginMap: _load_tile start %p", g_thread_self());
+	GritsTile      *tile = _tile;
+	GritsPluginMap *map  = _map;
+
+	g_debug("GritsPluginMap: _load_tile_thread start %p - tile=%p",
+			g_thread_self(), tile);
 	if (map->aborted) {
-		g_debug("GritsPluginMap: _load_tile - aborted");
+		g_debug("GritsPluginMap: _load_tile_thread - aborted");
 		return;
 	}
 
@@ -63,7 +66,7 @@ static void _load_tile(GritsTile *tile, gpointer _map)
 	/* Load pixbuf */
 	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(path, NULL);
 	if (!pixbuf) {
-		g_warning("GritsPluginMap: _load_tile - Error loading pixbuf %s", path);
+		g_warning("GritsPluginMap: _load_tile_thread - Error loading pixbuf %s", path);
 		g_remove(path);
 		g_free(path);
 		return;
@@ -92,19 +95,14 @@ static void _load_tile(GritsTile *tile, gpointer _map)
 
 	/* Load the GL texture from the main thread */
 	grits_tile_load_pixbuf(tile, pixbuf);
-	g_debug("GritsPluginMap: _load_tile end %p", g_thread_self());
+	g_debug("GritsPluginMap: _load_tile_thread end %p", g_thread_self());
 }
 
-static void _update_tiles(gpointer _, gpointer _map)
+static void _load_tile_func(GritsTile *tile, gpointer _map)
 {
-	g_debug("GritsPluginMap: _update_tiles");
+	g_debug("GritsPluginMap: _load_tile_func - tile=%p", tile);
 	GritsPluginMap *map = _map;
-	GritsPoint eye;
-	grits_viewer_get_location(map->viewer, &eye.lat, &eye.lon, &eye.elev);
-	grits_tile_update(map->tiles, &eye,
-			MAX_RESOLUTION, TILE_WIDTH, TILE_WIDTH,
-			_load_tile, map);
-	grits_tile_gc(map->tiles, time(NULL)-10, NULL, map);
+	g_thread_pool_push(map->threads, tile, NULL);
 }
 
 /*************
@@ -113,7 +111,11 @@ static void _update_tiles(gpointer _, gpointer _map)
 static void _on_location_changed(GritsViewer *viewer,
 		gdouble lat, gdouble lon, gdouble elev, GritsPluginMap *map)
 {
-	g_thread_pool_push(map->threads, NULL+1, NULL);
+	GritsPoint eye = {lat, lon, elev};
+	grits_tile_update(map->tiles, &eye,
+			MAX_RESOLUTION, TILE_WIDTH, TILE_WIDTH,
+			_load_tile_func, map);
+	grits_tile_gc(map->tiles, time(NULL)-10, NULL, map);
 }
 
 /***********
@@ -134,7 +136,9 @@ GritsPluginMap *grits_plugin_map_new(GritsViewer *viewer)
 	map->viewer = g_object_ref(viewer);
 
 	/* Load initial tiles */
-	_update_tiles(NULL, map);
+	gdouble lat, lon, elev;
+	grits_viewer_get_location(viewer, &lat, &lon, &elev);
+	_on_location_changed(viewer, lat, lon, elev, map);
 
 	/* Connect signals */
 	map->sigid = g_signal_connect(map->viewer, "location-changed",
@@ -165,7 +169,7 @@ static void grits_plugin_map_init(GritsPluginMap *map)
 {
 	g_debug("GritsPluginMap: init");
 	/* Set defaults */
-	map->threads = g_thread_pool_new(_update_tiles, map, 1, FALSE, NULL);
+	map->threads = g_thread_pool_new(_load_tile_thread, map, 1, FALSE, NULL);
 	map->tiles = grits_tile_new(NULL, 85.0511, -85.0511, EAST, WEST);
 	map->tms   = grits_tms_new("http://tile.openstreetmap.org",
 		"osmtile/", "png");
@@ -185,13 +189,13 @@ static void grits_plugin_map_dispose(GObject *gobject)
 	/* Drop references */
 	if (map->viewer) {
 		GritsViewer *viewer = map->viewer;
-		map->viewer = NULL;
 		g_signal_handler_disconnect(viewer, map->sigid);
-		grits_viewer_remove(viewer, GRITS_OBJECT(map->tiles));
-		g_object_unref(map->tiles);
 		soup_session_abort(map->tms->http->soup);
 		//soup_session_abort(map->wms->http->soup);
 		g_thread_pool_free(map->threads, TRUE, TRUE);
+		map->viewer = NULL;
+		grits_viewer_remove(viewer, GRITS_OBJECT(map->tiles));
+		g_object_unref(map->tiles);
 		g_object_unref(viewer);
 	}
 	G_OBJECT_CLASS(grits_plugin_map_parent_class)->dispose(gobject);

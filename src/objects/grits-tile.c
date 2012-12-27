@@ -224,7 +224,7 @@ void grits_tile_update(GritsTile *tile, GritsPoint *eye,
 	}
 
 	/* Load the tile */
-	if (!tile->load && !tile->data)
+	if (!tile->load && !tile->pixels && !tile->tex)
 		load_func(tile, user_data);
 	tile->atime = time(NULL);
 	tile->load  = TRUE;
@@ -247,6 +247,99 @@ void grits_tile_update(GritsTile *tile, GritsPoint *eye,
 }
 
 /**
+ * grits_tile_load_pixels:
+ * @tile:   the tile to load data into
+ * @pixels: buffered pixel data
+ * @width:  width of the pixel buffer (in pixels)
+ * @height: height of the pixel buffer (in pixels)
+ * @alpha:  TRUE if the pixel data contains an alpha channel
+ *
+ * Load tile data from an in memory pixel buffer.
+ *
+ * This function is thread safe and my be called from outside the main thread.
+ *
+ * Ownership of the pixel buffer is passed to the tile, it should not be freed
+ * or modified after calling this function.
+ *
+ * Returns: TRUE if the image was loaded successfully
+ */
+gboolean grits_tile_load_pixels(GritsTile *tile, guchar *pixels,
+		gint width, gint height, gint alpha)
+{
+	g_debug("GritsTile: load_pixels - %p -> %p (%dx%d:%d)",
+			tile, pixels, width, height, alpha);
+
+	/* Copy pixbuf data for callback */
+	tile->width  = width;
+	tile->height = height;
+	tile->alpha  = alpha;
+	tile->pixels = pixels;
+
+	/* Queue OpenGL texture load/draw */
+	grits_object_queue_draw(GRITS_OBJECT(tile));
+	return TRUE;
+}
+
+/**
+ * grits_tile_load_file:
+ * @tile: the tile to load data into
+ * @file: path to an image file to load
+ *
+ * Load tile data from a GdkPixbuf
+ * This function is thread safe and my be called from outside the main thread.
+ *
+ * Returns: TRUE if the image was loaded successfully
+ */
+gboolean grits_tile_load_pixbuf(GritsTile *tile, GdkPixbuf *pixbuf)
+{
+	g_debug("GritsTile: load_pixbuf %p -> %p", tile, pixbuf);
+
+	/* Copy pixbuf data for callback */
+	tile->pixbuf = g_object_ref(pixbuf);
+	tile->width  = gdk_pixbuf_get_width(pixbuf);
+	tile->height = gdk_pixbuf_get_height(pixbuf);
+	tile->alpha  = gdk_pixbuf_get_has_alpha(pixbuf);
+	tile->pixels = gdk_pixbuf_get_pixels(pixbuf);
+
+	/* Queue OpenGL texture load/draw */
+	grits_object_queue_draw(GRITS_OBJECT(tile));
+
+	return TRUE;
+}
+
+/**
+ * grits_tile_load_file:
+ * @tile: the tile to load data into
+ * @file: path to an image file to load
+ *
+ * Load tile data from an image file
+ * This function is thread safe and my be called from outside the main thread.
+ *
+ * Returns: TRUE if the image was loaded successfully
+ */
+gboolean grits_tile_load_file(GritsTile *tile, const gchar *file)
+{
+	g_debug("GritsTile: load_file %p -> %s", tile, file);
+
+	/* Load pixbuf */
+	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(file, NULL);
+	if (!pixbuf)
+		return FALSE;
+
+	/* Copy pixbuf data for callback */
+	tile->pixbuf = pixbuf;
+	tile->width  = gdk_pixbuf_get_width(pixbuf);
+	tile->height = gdk_pixbuf_get_height(pixbuf);
+	tile->alpha  = gdk_pixbuf_get_has_alpha(pixbuf);
+	tile->pixels = gdk_pixbuf_get_pixels(pixbuf);
+
+	/* Queue OpenGL texture load/draw */
+	grits_object_queue_draw(GRITS_OBJECT(tile));
+
+	return TRUE;
+}
+
+/**
  * grits_tile_find:
  * @root: the root tile to search from
  * @lat:  target latitude
@@ -254,7 +347,7 @@ void grits_tile_update(GritsTile *tile, GritsPoint *eye,
  *
  * Locate the subtile with the highest resolution which contains the given
  * lat/lon point.
- * 
+ *
  * Returns: the child tile
  */
 GritsTile *grits_tile_find(GritsTile *root, gdouble lat, gdouble lon)
@@ -317,8 +410,17 @@ GritsTile *grits_tile_gc(GritsTile *root, time_t atime,
 	if (root->parent && !has_children && root->atime < atime &&
 			(root->data || !root->load)) {
 		//g_debug("GritsTile: gc/free - %p", root);
-		if (root->data)
-			free_func(root, user_data);
+		if (root->tex) {
+			glDeleteTextures(1, &root->tex);
+			root->tex = 0;
+		}
+		if (root->data) {
+			if (free_func)
+				free_func(root, user_data);
+			else
+				g_free(root->data);
+			root->data = NULL;
+		}
 		g_object_unref(root);
 		return NULL;
 	}
@@ -368,10 +470,55 @@ static guint _grits_tile_load_mask(void)
 	return tex;
 }
 
+/* Load the texture from saved pixel data */
+static gboolean _grits_tile_load_tex(GritsTile *tile)
+{
+	/* Abort for null tiles */
+	if (!tile)
+		return FALSE;
+
+	/* Defer loading of hidden tiles */
+	if (GRITS_OBJECT(tile)->hidden)
+		return FALSE;
+
+	/* If we're already done loading the text stop */
+	if (tile->tex)
+		return TRUE;
+
+	/* Check if the tile has data yet */
+	if (!tile->pixels)
+		return FALSE;
+
+	/* Create texture */
+	g_debug("GritsTile: load_tex");
+	glGenTextures(1, &tile->tex);
+	glBindTexture(GL_TEXTURE_2D, tile->tex);
+
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, 4, tile->width, tile->height, 0,
+			(tile->alpha ? GL_RGBA : GL_RGB), GL_UNSIGNED_BYTE, tile->pixels);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	/* Free data */
+	if (tile->pixbuf)
+		g_object_unref(tile->pixbuf);
+	else
+		g_free(tile->pixels);
+	tile->pixbuf = NULL;
+	tile->pixels = NULL;
+
+	return TRUE;
+
+}
+
 /* Draw a single tile */
 static void grits_tile_draw_one(GritsTile *tile, GritsOpenGL *opengl, GList *triangles)
 {
-	if (!tile || !tile->data)
+	if (!tile || !tile->tex)
 		return;
 	if (!triangles)
 		g_warning("GritsOpenGL: _draw_tiles - No triangles to draw: edges=%f,%f,%f,%f",
@@ -437,7 +584,7 @@ static void grits_tile_draw_one(GritsTile *tile, GritsOpenGL *opengl, GList *tri
 		}
 
 		/* Draw triangle */
-		glBindTexture(GL_TEXTURE_2D, *(guint*)tile->data);
+		glBindTexture(GL_TEXTURE_2D, tile->tex);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 		glBegin(GL_TRIANGLES);
 		glNormal3dv(tri->p.r->norm); glMultiTexCoord2dv(GL_TEXTURE0, xy[0]); glMultiTexCoord2dv(GL_TEXTURE1, xy[0]); glVertex3dv((double*)tri->p.r);
@@ -455,7 +602,7 @@ static gboolean grits_tile_draw_rec(GritsTile *tile, GritsOpenGL *opengl)
 	//		tile ? !!tile->load : 0,
 	//		tile ? !!GRITS_OBJECT(tile)->hidden : 0);
 
-	if (!tile || !tile->data || GRITS_OBJECT(tile)->hidden)
+	if (!_grits_tile_load_tex(tile))
 		return FALSE;
 
 	GritsTile *child = NULL;

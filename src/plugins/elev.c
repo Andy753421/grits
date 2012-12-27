@@ -43,12 +43,6 @@
 #define TILE_CHANNELS  4
 #define TILE_SIZE      (TILE_WIDTH*TILE_HEIGHT*sizeof(guint16))
 
-struct _TileData {
-	/* OpenGL has to be first to make grits_tile_draw happy */
-	guint    tex;
-	guint16 *bil;
-};
-
 static gdouble _height_func(gdouble lat, gdouble lon, gpointer _elev)
 {
 	GritsPluginElev *elev = _elev;
@@ -57,10 +51,7 @@ static gdouble _height_func(gdouble lat, gdouble lon, gpointer _elev)
 	GritsTile *tile = grits_tile_find(elev->tiles, lat, lon);
 	if (!tile) return 0;
 
-	struct _TileData *data = tile->data;
-	if (!data) return 0;
-
-	guint16 *bil  = data->bil;
+	guint16 *bil = tile->data;
 	if (!bil)  return 0;
 
 	gint w = TILE_WIDTH;
@@ -104,13 +95,6 @@ static gdouble _height_func(gdouble lat, gdouble lon, gpointer _elev)
  * Loader and Freeers *
  **********************/
 
-struct _LoadTileData {
-	GritsPluginElev  *elev;
-	GritsTile        *tile;
-	guint8           *pixels;
-	struct _TileData *tdata;
-};
-
 static guint16 *_load_bil(gchar *path)
 {
 	gsize len;
@@ -149,53 +133,9 @@ static guchar *_load_pixels(guint16 *bil)
 	return (guchar*)pixels;
 }
 
-static gboolean _load_tile_cb(gpointer _data)
-{
-	struct _LoadTileData *data  = _data;
-	struct _TileData     *tdata = data->tdata;
-	g_debug("GritsPluginElev: _load_tile_cb start");
-	if (data->elev->aborted) {
-		g_debug("GritsPluginElev: _load_tile - aborted");
-		return FALSE;
-	}
-
-	/* Load OpenGL texture (from main thread) */
-	if (data->pixels) {
-		glGenTextures(1, &tdata->tex);
-		glBindTexture(GL_TEXTURE_2D, tdata->tex);
-
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		glPixelStorei(GL_PACK_ALIGNMENT, 1);
-		glTexImage2D(GL_TEXTURE_2D, 0, TILE_CHANNELS, TILE_WIDTH, TILE_HEIGHT, 0,
-				GL_RGBA, GL_UNSIGNED_BYTE, data->pixels);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glFlush();
-	}
-
-	/* Set hight function (from main thread) */
-	if (tdata->bil) {
-		grits_viewer_set_height_func(data->elev->viewer, &data->tile->edge,
-				_height_func, data->elev, TRUE);
-	}
-
-	/* Queue tiles for drawing */
-	data->tile->data = tdata;
-	gtk_widget_queue_draw(GTK_WIDGET(data->elev->viewer));
-
-	/* Cleanup */
-	g_free(data->pixels);
-	g_free(data);
-	return FALSE;
-}
-
 static void _load_tile(GritsTile *tile, gpointer _elev)
 {
 	GritsPluginElev *elev = _elev;
-	guint16 *bil    = NULL;
-	guchar  *pixels = NULL;
 
 	g_debug("GritsPluginElev: _load_tile start %p", g_thread_self());
 	if (elev->aborted) {
@@ -205,49 +145,35 @@ static void _load_tile(GritsTile *tile, gpointer _elev)
 
 	/* Download tile */
 	gchar *path = grits_wms_fetch(elev->wms, tile, GRITS_ONCE, NULL, NULL);
-	if (!path) return;
+	if (!path)
+		return;
 
 	/* Load bil */
-	bil = _load_bil(path);
+	guint16 *bil = _load_bil(path);
 	g_free(path);
-	if (!bil) return;
+	if (!bil)
+		return;
 
-	/* Load pixels */
-	if (LOAD_TEX)
-		pixels = _load_pixels(bil);
+	/* Set hight function (TODO: from main thread?) */
+	if (LOAD_BIL) {
+		tile->data = bil;
+		grits_viewer_set_height_func(elev->viewer, &tile->edge,
+				_height_func, elev, TRUE);
+	}
+
+	/* Load pixels for grayscale height textures */
+	if (LOAD_TEX) {
+		guchar *pixels = _load_pixels(bil);
+		grits_tile_load_pixels(tile, pixels,
+			TILE_WIDTH, TILE_HEIGHT, TILE_CHANNELS==4);
+	}
+
+	/* Free bill if we're not interested in a hight function */
 	if (!LOAD_BIL)
 		g_free(bil);
 
-	/* Copy pixbuf data for callback */
-	struct _LoadTileData *data  = g_new0(struct _LoadTileData, 1);
-	struct _TileData     *tdata = g_new0(struct _TileData,     1);
-	data->elev   = elev;
-	data->tile   = tile;
-	data->pixels = pixels;
-	data->tdata  = tdata;
-	tdata->tex   = 0;
-	tdata->bil   = bil;
-
 	/* Load the GL texture from the main thread */
-	g_idle_add_full(G_PRIORITY_LOW, _load_tile_cb, data, NULL);
 	g_debug("GritsPluginElev: _load_tile end %p", g_thread_self());
-}
-
-static gboolean _free_tile_cb(gpointer _data)
-{
-	struct _TileData *data = _data;
-	if (LOAD_BIL)
-		g_free(data->bil);
-	if (LOAD_TEX)
-		glDeleteTextures(1, &data->tex);
-	g_free(data);
-	return FALSE;
-}
-static void _free_tile(GritsTile *tile, gpointer _elev)
-{
-	g_debug("GritsPluginElev: _free_tile: %p", tile->data);
-	if (tile->data)
-		g_idle_add_full(G_PRIORITY_LOW, _free_tile_cb, tile->data, NULL);
 }
 
 static void _update_tiles(gpointer _, gpointer _elev)
@@ -259,8 +185,7 @@ static void _update_tiles(gpointer _, gpointer _elev)
 	grits_tile_update(elev->tiles, &eye,
 			MAX_RESOLUTION, TILE_WIDTH, TILE_WIDTH,
 			_load_tile, elev);
-	grits_tile_gc(elev->tiles, time(NULL)-10,
-			_free_tile, elev);
+	grits_tile_gc(elev->tiles, time(NULL)-10, NULL, elev);
 }
 
 /*************
@@ -346,8 +271,6 @@ static void grits_plugin_elev_dispose(GObject *gobject)
 		g_object_unref(elev->tiles);
 		soup_session_abort(elev->wms->http->soup);
 		g_thread_pool_free(elev->threads, TRUE, TRUE);
-		while (gtk_events_pending())
-			gtk_main_iteration();
 		g_object_unref(viewer);
 	}
 	G_OBJECT_CLASS(grits_plugin_elev_parent_class)->dispose(gobject);
@@ -358,7 +281,7 @@ static void grits_plugin_elev_finalize(GObject *gobject)
 	GritsPluginElev *elev = GRITS_PLUGIN_ELEV(gobject);
 	/* Free data */
 	grits_wms_free(elev->wms);
-	grits_tile_free(elev->tiles, _free_tile, elev);
+	grits_tile_free(elev->tiles, NULL, elev);
 	G_OBJECT_CLASS(grits_plugin_elev_parent_class)->finalize(gobject);
 
 }

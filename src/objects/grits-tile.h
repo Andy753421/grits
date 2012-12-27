@@ -57,6 +57,14 @@ struct _GritsTile {
 
 	/* Projection used by tile data */
 	GritsProj proj;
+
+	/* Internal data to the tile */
+	guint      tex;
+	GdkPixbuf *pixbuf;
+	guchar    *pixels;
+	gint       width;
+	gint       height;
+	gint       alpha;
 };
 
 struct _GritsTileClass {
@@ -124,6 +132,16 @@ gchar *grits_tile_get_path(GritsTile *child);
 void grits_tile_update(GritsTile *root, GritsPoint *eye,
 		gdouble res, gint width, gint height,
 		GritsTileLoadFunc load_func, gpointer user_data);
+
+/* Load tile data from pixel buffer */
+gboolean grits_tile_load_pixels(GritsTile *tile, guchar *pixels,
+		gint width, gint height, gint channels);
+
+/* Load tile data from a GdkPixbuf */
+gboolean grits_tile_load_pixbuf(GritsTile *tile, GdkPixbuf *pixbuf);
+
+/* Load tile data from an image file */
+gboolean grits_tile_load_file(GritsTile *tile, const gchar *file);
 
 /* Find the leaf tile containing lat-lon */
 GritsTile *grits_tile_find(GritsTile *root, gdouble lat, gdouble lon);

@@ -631,6 +631,7 @@ RoamSphere *roam_sphere_new()
 	sphere->polys       = 8;
 	sphere->triangles   = g_pqueue_new((GCompareDataFunc)tri_cmp, NULL);
 	sphere->diamonds    = g_pqueue_new((GCompareDataFunc)dia_cmp, NULL);
+	sphere->view        = g_new0(RoamView, 1);
 
 	RoamPoint *vertexes[] = {
 		roam_point_new( 90,   0,  0), // 0 (North)
@@ -684,8 +685,6 @@ RoamSphere *roam_sphere_new()
  */
 void roam_sphere_update_view(RoamSphere *sphere)
 {
-	if (!sphere->view)
-		sphere->view = g_new0(RoamView, 1);
 	glGetDoublev (GL_MODELVIEW_MATRIX,  sphere->view->model);
 	glGetDoublev (GL_PROJECTION_MATRIX, sphere->view->proj);
 	glGetIntegerv(GL_VIEWPORT,          sphere->view->view);

@@ -236,6 +236,8 @@ gboolean expose(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
  * Mac OSX implementation *
  **************************/
 #elif defined(SYS_MAC)
+#include <OpenGL/gl.h>
+#include <OpenGL/glu.h>
 #include <gdk/gdkquartz.h>
 gpointer setup(GtkWidget *widget)
 {

@@ -288,6 +288,8 @@ void gtk_gl_begin(GtkWidget *widget)
 	GtkAllocation alloc;
 	gdk_window_ensure_native(gtk_widget_get_window(widget));
 	gtk_widget_get_allocation(widget, &alloc);
+	gtk_widget_translate_coordinates(widget, gtk_widget_get_toplevel(widget),
+		0, 0, &alloc.x, &alloc.y);
 
 	NSOpenGLContext *ctx  = g_object_get_data(G_OBJECT(widget), "glcontext");
 	GdkWindow       *win  = gtk_widget_get_window(widget);

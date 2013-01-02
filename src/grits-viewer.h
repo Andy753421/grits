@@ -122,6 +122,7 @@ struct _GritsViewer {
 
 	/* For queue_draw */
 	guint   draw_source;
+	GMutex  draw_lock;
 };
 
 struct _GritsViewerClass {

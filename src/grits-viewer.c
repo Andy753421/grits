@@ -74,8 +74,10 @@ static void _grits_viewer_fix_rotation(GritsViewer *viewer)
 static gboolean _grits_viewer_queue_draw_cb(gpointer _viewer)
 {
 	GritsViewer *viewer = _viewer;
+	g_mutex_lock(&viewer->draw_lock);
 	gtk_widget_queue_draw(GTK_WIDGET(viewer));
 	viewer->draw_source = 0;
+	g_mutex_unlock(&viewer->draw_lock);
 	return FALSE;
 }
 
@@ -441,9 +443,11 @@ gboolean grits_viewer_get_offline(GritsViewer *viewer)
  */
 void grits_viewer_queue_draw(GritsViewer *viewer)
 {
+	g_mutex_lock(&viewer->draw_lock);
 	if (!viewer->draw_source)
 		viewer->draw_source = g_idle_add_full(G_PRIORITY_HIGH,
 				_grits_viewer_queue_draw_cb, viewer, NULL);
+	g_mutex_unlock(&viewer->draw_lock);
 }
 
 /***********************************
@@ -615,6 +619,8 @@ static void grits_viewer_init(GritsViewer *viewer)
 	viewer->rotation[1] = 0;
 	viewer->rotation[2] = 0;
 
+	g_mutex_init(&viewer->draw_lock);
+
 	g_object_set(viewer, "can-focus", TRUE, NULL);
 	gtk_widget_add_events(GTK_WIDGET(viewer),
 			GDK_BUTTON_PRESS_MASK |
@@ -636,13 +642,17 @@ static void grits_viewer_dispose(GObject *gobject)
 {
 	g_debug("GritsViewer: dispose");
 	GritsViewer *viewer = GRITS_VIEWER(gobject);
+	g_mutex_lock(&viewer->draw_lock);
 	if (viewer->draw_source)
 		g_source_remove(viewer->draw_source);
+	g_mutex_unlock(&viewer->draw_lock);
 	G_OBJECT_CLASS(grits_viewer_parent_class)->dispose(gobject);
 }
 static void grits_viewer_finalize(GObject *gobject)
 {
 	g_debug("GritsViewer: finalize");
+	GritsViewer *viewer = GRITS_VIEWER(gobject);
+	g_mutex_clear(&viewer->draw_lock);
 	G_OBJECT_CLASS(grits_viewer_parent_class)->finalize(gobject);
 	g_debug("GritsViewer: finalize - done");
 }

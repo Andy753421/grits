@@ -300,6 +300,7 @@ void gtk_gl_begin(GtkWidget *widget)
 	[ctx  makeCurrentContext];
 	[ctx  update];
 	[view setFrame:rect];
+	[view setWantsBestResolutionOpenGLSurface:YES];
 }
 
 void gtk_gl_end(GtkWidget *widget)

@@ -40,6 +40,8 @@
 
 // #define ROAM_DEBUG
 
+#define OVERLAY_SLICE 0.01
+
 /* Tessellation, "finding intersecting triangles" */
 /* http://research.microsoft.com/pubs/70307/tr-2006-81.pdf */
 /* http://www.opengl.org/wiki/Alpha_Blending */
@@ -312,9 +314,10 @@ static void _draw_level(gpointer _level, gpointer _opengl)
 		/* Enable depth and alpha for world levels */
 		glEnable(GL_ALPHA_TEST);
 		glAlphaFunc(GL_GREATER, 0.1);
+		glDepthRange(OVERLAY_SLICE, 1);
 	} else {
-		/* Disable depth for Overlay/HUD levels */
-		glDepthMask(FALSE);
+		/* Draw overlay in front of world */
+		glDepthRange(0, OVERLAY_SLICE);
 	}
 
 	/* Start ortho */
@@ -512,6 +515,7 @@ static void grits_opengl_unproject(GritsViewer *_opengl,
 		glReadPixels(px, py, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &tmp);
 		pz = tmp;
 	}
+	pz = (pz-OVERLAY_SLICE) * (1.0/(1-OVERLAY_SLICE));
 	gluUnProject(px, py, pz,
 		opengl->sphere->view->model,
 		opengl->sphere->view->proj,

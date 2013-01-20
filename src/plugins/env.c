@@ -327,7 +327,7 @@ GritsPluginEnv *grits_plugin_env_new(GritsViewer *viewer, GritsPrefs *prefs)
 
 	/* Add compass */
 	GritsCallback *compass = grits_callback_new(compass_expose, env);
-	grits_viewer_add(viewer, GRITS_OBJECT(compass), GRITS_LEVEL_HUD, FALSE);
+	grits_viewer_add(viewer, GRITS_OBJECT(compass), GRITS_LEVEL_HUD, TRUE);
 	g_signal_connect(compass, "clicked", G_CALLBACK(compass_click), viewer);
 	grits_object_set_cursor(GRITS_OBJECT(compass), GDK_CROSS);
 	env->refs = g_list_prepend(env->refs, compass);

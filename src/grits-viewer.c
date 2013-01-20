@@ -117,22 +117,22 @@ static void _grits_viewer_emit_offline(GritsViewer *viewer)
 static gboolean on_key_press(GritsViewer *viewer, GdkEventKey *event, gpointer _)
 {
 	g_debug("GritsViewer: on_key_press - key=%x, state=%x, plus=%x",
-			event->keyval, event->state, GDK_plus);
+			event->keyval, event->state, GDK_KEY_plus);
 
 	double lat, lon, elev, pan;
 	grits_viewer_get_location(viewer, &lat, &lon, &elev);
 	pan = MIN(elev/(EARTH_R/2), 30);
 	switch (event->keyval) {
-	case GDK_Left:  case GDK_h: grits_viewer_pan(viewer,  0,  -pan, 0); break;
-	case GDK_Down:  case GDK_j: grits_viewer_pan(viewer, -pan, 0,   0); break;
-	case GDK_Up:    case GDK_k: grits_viewer_pan(viewer,  pan, 0,   0); break;
-	case GDK_Right: case GDK_l: grits_viewer_pan(viewer,  0,   pan, 0); break;
-	case GDK_minus: case GDK_o: grits_viewer_zoom(viewer, 10./9); break;
-	case GDK_plus:  case GDK_i: grits_viewer_zoom(viewer, 9./10); break;
-	case GDK_H: grits_viewer_rotate(viewer,  0, 0, -2); break;
-	case GDK_J: grits_viewer_rotate(viewer,  2, 0,  0); break;
-	case GDK_K: grits_viewer_rotate(viewer, -2, 0,  0); break;
-	case GDK_L: grits_viewer_rotate(viewer,  0, 0,  2); break;
+	case GDK_KEY_Left:  case GDK_KEY_h: grits_viewer_pan(viewer,  0,  -pan, 0); break;
+	case GDK_KEY_Down:  case GDK_KEY_j: grits_viewer_pan(viewer, -pan, 0,   0); break;
+	case GDK_KEY_Up:    case GDK_KEY_k: grits_viewer_pan(viewer,  pan, 0,   0); break;
+	case GDK_KEY_Right: case GDK_KEY_l: grits_viewer_pan(viewer,  0,   pan, 0); break;
+	case GDK_KEY_minus: case GDK_KEY_o: grits_viewer_zoom(viewer, 10./9); break;
+	case GDK_KEY_plus:  case GDK_KEY_i: grits_viewer_zoom(viewer, 9./10); break;
+	case GDK_KEY_H: grits_viewer_rotate(viewer,  0, 0, -2); break;
+	case GDK_KEY_J: grits_viewer_rotate(viewer,  2, 0,  0); break;
+	case GDK_KEY_K: grits_viewer_rotate(viewer, -2, 0,  0); break;
+	case GDK_KEY_L: grits_viewer_rotate(viewer,  0, 0,  2); break;
 	}
 	return FALSE;
 }

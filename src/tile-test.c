@@ -127,7 +127,7 @@ gpointer do_osm2_cache(gpointer _image)
 
 gboolean key_press_cb(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
-	if (event->keyval == GDK_q)
+	if (event->keyval == GDK_KEY_q)
 		gtk_main_quit();
 	return TRUE;
 }

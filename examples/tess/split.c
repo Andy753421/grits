@@ -93,7 +93,7 @@ static gboolean on_configure(GtkWidget *drawing, GdkEventConfigure *event, gpoin
 
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer _)
 {
-	if (event->keyval == GDK_q)
+	if (event->keyval == GDK_KEY_q)
 		gtk_main_quit();
 	return FALSE;
 }

@@ -90,20 +90,20 @@ static gboolean on_key_press(GritsTester *tester, GdkEventKey *event, gpointer _
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	     if (kv == GDK_q) gtk_main_quit();
-        else if (kv == GDK_w) tester->wireframe = !tester->wireframe;
-	else if (kv == GDK_h) glTranslated( 0.1,  0,  0);
-	else if (kv == GDK_l) glTranslated(-0.1,  0,  0);
-	else if (kv == GDK_j) glTranslated( 0,  0.1,  0);
-	else if (kv == GDK_k) glTranslated( 0, -0.1,  0);
-	else if (kv == GDK_i) glTranslated( 0,  0,  0.1);
-	else if (kv == GDK_o) glTranslated( 0,  0, -0.1);
-	else if (kv == GDK_H) glRotated(-5, 0,1,0);
-	else if (kv == GDK_L) glRotated( 5, 0,1,0);
-	else if (kv == GDK_J) glRotated( 5, 1,0,0);
-	else if (kv == GDK_K) glRotated(-5, 1,0,0);
-	else if (kv == GDK_I) glRotated(-5, 0,0,1);
-	else if (kv == GDK_O) glRotated( 5, 0,0,1);
+	     if (kv == GDK_KEY_q) gtk_main_quit();
+        else if (kv == GDK_KEY_w) tester->wireframe = !tester->wireframe;
+	else if (kv == GDK_KEY_h) glTranslated( 0.1,  0,  0);
+	else if (kv == GDK_KEY_l) glTranslated(-0.1,  0,  0);
+	else if (kv == GDK_KEY_j) glTranslated( 0,  0.1,  0);
+	else if (kv == GDK_KEY_k) glTranslated( 0, -0.1,  0);
+	else if (kv == GDK_KEY_i) glTranslated( 0,  0,  0.1);
+	else if (kv == GDK_KEY_o) glTranslated( 0,  0, -0.1);
+	else if (kv == GDK_KEY_H) glRotated(-5, 0,1,0);
+	else if (kv == GDK_KEY_L) glRotated( 5, 0,1,0);
+	else if (kv == GDK_KEY_J) glRotated( 5, 1,0,0);
+	else if (kv == GDK_KEY_K) glRotated(-5, 1,0,0);
+	else if (kv == GDK_KEY_I) glRotated(-5, 0,0,1);
+	else if (kv == GDK_KEY_O) glRotated( 5, 0,0,1);
 	glMultMatrixd(model);
 
 	gtk_widget_queue_draw(GTK_WIDGET(tester));

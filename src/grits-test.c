@@ -47,7 +47,7 @@ static gboolean on_delete(GtkWidget *widget, GdkEvent *event, gpointer data)
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
 		gpointer _)
 {
-	if (event->keyval == GDK_q)
+	if (event->keyval == GDK_KEY_q)
 		return grits_shutdown(widget);
 	return FALSE;
 }

@@ -318,7 +318,7 @@ gboolean expose(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
  ***************/
 gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
-	if (event->keyval == GDK_q)
+	if (event->keyval == GDK_KEY_q)
 		gtk_main_quit();
 	return FALSE;
 }

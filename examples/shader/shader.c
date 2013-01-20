@@ -39,7 +39,7 @@ gchar *gl_program_log(guint program, int *_len)
 void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
 	g_message("key-press");
-	if (event->keyval == GDK_q)
+	if (event->keyval == GDK_KEY_q)
 		gtk_main_quit();
 }
 

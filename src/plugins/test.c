@@ -65,9 +65,9 @@ static gboolean on_poly_key(GritsPoly *poly, GdkEventKey *event)
 {
 	g_debug("GritsPluginTest: on_poly_key - %d", event->keyval);
 	gdouble colors[0xff][3] = {
-		[GDK_r] {1, 0, 0},
-		[GDK_g] {0, 1, 0},
-		[GDK_b] {0, 0, 1},
+		[GDK_KEY_r] {1, 0, 0},
+		[GDK_KEY_g] {0, 1, 0},
+		[GDK_KEY_b] {0, 0, 1},
 	};
 	if (event->keyval >= G_N_ELEMENTS(colors))
 		return FALSE;

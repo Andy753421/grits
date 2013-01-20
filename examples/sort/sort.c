@@ -245,17 +245,17 @@ static gboolean on_configure(GtkWidget *drawing, GdkEventConfigure *event, gpoin
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer _)
 {
 	guint kv = event->keyval;
-	if      (kv == GDK_q) gtk_main_quit();
-	else if (kv == GDK_h) pos[0] -= 0.02;
-	else if (kv == GDK_j) pos[1] += 0.02;
-	else if (kv == GDK_k) pos[1] -= 0.02;
-	else if (kv == GDK_l) pos[0] += 0.02;
-	else if (kv == GDK_o) pos[2] -= 0.02;
-	else if (kv == GDK_i) pos[2] += 0.02;
-	else if (kv == GDK_H) rot[2] -= 2.0;
-	else if (kv == GDK_J) rot[0] += 2.0;
-	else if (kv == GDK_K) rot[0] -= 2.0;
-	else if (kv == GDK_L) rot[2] += 2.0;
+	if      (kv == GDK_KEY_q) gtk_main_quit();
+	else if (kv == GDK_KEY_h) pos[0] -= 0.02;
+	else if (kv == GDK_KEY_j) pos[1] += 0.02;
+	else if (kv == GDK_KEY_k) pos[1] -= 0.02;
+	else if (kv == GDK_KEY_l) pos[0] += 0.02;
+	else if (kv == GDK_KEY_o) pos[2] -= 0.02;
+	else if (kv == GDK_KEY_i) pos[2] += 0.02;
+	else if (kv == GDK_KEY_H) rot[2] -= 2.0;
+	else if (kv == GDK_KEY_J) rot[0] += 2.0;
+	else if (kv == GDK_KEY_K) rot[0] -= 2.0;
+	else if (kv == GDK_KEY_L) rot[2] += 2.0;
 	gtk_widget_queue_draw(widget);
 	return FALSE;
 }

@@ -141,10 +141,10 @@ static VolGrid *load_radar(gchar *file, gchar *site)
  **********/
 static gboolean key_press(GritsTester *tester, GdkEventKey *event, GritsVolume *volume)
 {
-	     if (event->keyval == GDK_v) grits_volume_set_level(volume, volume->level-0.5);
-	else if (event->keyval == GDK_V) grits_volume_set_level(volume, volume->level+0.5);
-	else if (event->keyval == GDK_d) dist  += 0.5;
-	else if (event->keyval == GDK_D) dist  -= 0.5;
+	     if (event->keyval == GDK_KEY_v) grits_volume_set_level(volume, volume->level-0.5);
+	else if (event->keyval == GDK_KEY_V) grits_volume_set_level(volume, volume->level+0.5);
+	else if (event->keyval == GDK_KEY_d) dist  += 0.5;
+	else if (event->keyval == GDK_KEY_D) dist  -= 0.5;
 	return FALSE;
 }
 

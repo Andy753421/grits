@@ -399,23 +399,23 @@ static gboolean on_expose(GritsOpenGL *opengl, GdkEventExpose *event, gpointer _
 static gboolean on_key_press(GritsOpenGL *opengl, GdkEventKey *event, gpointer _)
 {
 	g_debug("GritsOpenGL: on_key_press - key=%x, state=%x, plus=%x",
-			event->keyval, event->state, GDK_plus);
+			event->keyval, event->state, GDK_KEY_plus);
 
 	guint kv = event->keyval;
 	/* Testing */
-	if (kv == GDK_w) {
+	if (kv == GDK_KEY_w) {
 		opengl->wireframe = !opengl->wireframe;
 		grits_viewer_queue_draw(GRITS_VIEWER(opengl));
 	}
-	if (kv == GDK_p) {
+	if (kv == GDK_KEY_p) {
 		opengl->pickmode = !opengl->pickmode;
 		grits_viewer_queue_draw(GRITS_VIEWER(opengl));
 	}
 #ifdef ROAM_DEBUG
-	else if (kv == GDK_n) roam_sphere_split_one(opengl->sphere);
-	else if (kv == GDK_p) roam_sphere_merge_one(opengl->sphere);
-	else if (kv == GDK_r) roam_sphere_split_merge(opengl->sphere);
-	else if (kv == GDK_u) roam_sphere_update_errors(opengl->sphere);
+	else if (kv == GDK_KEY_n) roam_sphere_split_one(opengl->sphere);
+	else if (kv == GDK_KEY_p) roam_sphere_merge_one(opengl->sphere);
+	else if (kv == GDK_KEY_r) roam_sphere_split_merge(opengl->sphere);
+	else if (kv == GDK_KEY_u) roam_sphere_update_errors(opengl->sphere);
 	grits_viewer_queue_draw(GRITS_VIEWER(opengl));
 #endif
 	return FALSE;

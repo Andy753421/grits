@@ -68,8 +68,10 @@ static void _set_projection(GritsOpenGL *opengl)
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
-	double width  = GTK_WIDGET(opengl)->allocation.width;
-	double height = GTK_WIDGET(opengl)->allocation.height;
+	GtkAllocation alloc;
+	gtk_widget_get_allocation(GTK_WIDGET(opengl), &alloc);
+	double width  = alloc.width;
+	double height = alloc.height;
 	double ang    = atan((height/2)/FOV_DIST)*2;
 	double atmos  = 100000;
 	double near   = MAX(elev*0.75 - atmos, 50); // View 100km of atmosphere
@@ -219,9 +221,11 @@ static gint run_picking(GritsOpenGL *opengl, GdkEvent *event,
 
 static gboolean run_mouse_move(GritsOpenGL *opengl, GdkEventMotion *event)
 {
-	gdouble height = GTK_WIDGET(opengl)->allocation.height;
+	GtkAllocation alloc;
+	gtk_widget_get_allocation(GTK_WIDGET(opengl), &alloc);
+
 	gdouble gl_x   = event->x;
-	gdouble gl_y   = height - event->y;
+	gdouble gl_y   = alloc.height - event->y;
 	gdouble delta  = opengl->pickmode ? 200 : 2;
 
 	if (opengl->pickmode) {
@@ -322,11 +326,11 @@ static void _draw_level(gpointer _level, gpointer _opengl)
 
 	/* Start ortho */
 	if (level->num >= GRITS_LEVEL_HUD) {
+		GtkAllocation alloc;
+		gtk_widget_get_allocation(GTK_WIDGET(opengl), &alloc);
 		glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
 		glMatrixMode(GL_MODELVIEW);  glPushMatrix(); glLoadIdentity();
-		gint win_width  = GTK_WIDGET(opengl)->allocation.width;
-		gint win_height = GTK_WIDGET(opengl)->allocation.height;
-		glOrtho(0, win_width, win_height, 0, 1000, -1000);
+		glOrtho(0, alloc.width, alloc.height, 0, 1000, -1000);
 	}
 
 	/* Draw unsorted objects without depth testing,

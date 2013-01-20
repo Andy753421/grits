@@ -256,11 +256,12 @@ static void grits_marker_draw(GritsObject *_marker, GritsOpenGL *opengl)
 				point->lat, point->lon, point->elev,
 				&px, &py, &pz);
 
-		gint win_height = GTK_WIDGET(opengl)->allocation.height;
 		if (pz > 1)
 			return;
 
-		glTranslated(px, win_height-py, 0);
+		GtkAllocation alloc;
+		gtk_widget_get_allocation(GTK_WIDGET(opengl), &alloc);
+		glTranslated(px, alloc.height-py, 0);
 		glRotatef(marker->angle, 0, 0, -1);
 		glTranslated(-marker->xoff, -marker->yoff, 0);
 	} else {

@@ -195,11 +195,11 @@ static void compass_expose(GritsCallback *compass, GritsOpenGL *opengl, gpointer
 	grits_viewer_get_rotation(env->viewer, &x, &y, &z);
 
 	/* Setup projection */
-	gint win_width  = GTK_WIDGET(opengl)->allocation.width;
-	gint win_height = GTK_WIDGET(opengl)->allocation.height;
-	float scale     = CLAMP(MIN(win_width,win_height)/2.0 * 0.1, 40, 100);
+	GtkAllocation alloc;
+	gtk_widget_get_allocation(GTK_WIDGET(opengl), &alloc);
+	float scale     = CLAMP(MIN(alloc.width,alloc.height)/2.0 * 0.1, 40, 100);
 	float offset    = scale + 20;
-	glTranslatef(win_width - offset, offset, 0);
+	glTranslatef(alloc.width - offset, offset, 0);
 
 	/* Setup state */
 	glClear(GL_DEPTH_BUFFER_BIT);
@@ -226,8 +226,8 @@ static gboolean compass_click(GritsCallback *compass, GdkEvent *evnet, GritsView
 /* Info */
 static void info_expose(GritsCallback *compass, GritsOpenGL *opengl, gpointer _env)
 {
-	gint win_width  = GTK_WIDGET(opengl)->allocation.width;
-	gint win_height = GTK_WIDGET(opengl)->allocation.height;
+	GtkAllocation alloc;
+	gtk_widget_get_allocation(GTK_WIDGET(opengl), &alloc);
 
 	/* Create cairo  surface */
 	guint            tex     = 0;
@@ -292,7 +292,7 @@ static void info_expose(GritsCallback *compass, GritsOpenGL *opengl, gpointer _e
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glDisable(GL_CULL_FACE);
-	glTranslatef(win_width - width, win_height - height, 0);
+	glTranslatef(alloc.width - width, alloc.height - height, 0);
 	glBegin(GL_QUADS);
 	glTexCoord2f(1, 0); glVertex3f(width, 0     , 0); // 0 - 3    0
 	glTexCoord2f(1, 1); glVertex3f(width, height, 0); // 1 - |    |

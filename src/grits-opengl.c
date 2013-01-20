@@ -356,12 +356,12 @@ static void _draw_level(gpointer _level, gpointer _opengl)
 			nunsorted, nsorted);
 }
 
-static gboolean on_expose(GritsOpenGL *opengl, GdkEventExpose *event, gpointer _)
+static gboolean on_expose(GritsOpenGL *opengl, gpointer data, gpointer _)
 {
 	g_debug("GritsOpenGL: on_expose - begin");
 
 	if (opengl->pickmode)
-		return run_mouse_move(opengl, (GdkEventMotion*)event);
+		return run_mouse_move(opengl, &(GdkEventMotion){});
 
 	if (opengl->mouse_queue.type != GDK_NOTHING) {
 		run_mouse_move(opengl, &opengl->mouse_queue);

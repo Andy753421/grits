@@ -13,7 +13,7 @@
  ************************/
 #if defined(SYS_CAIRO)
 gpointer setup(GtkWidget *widget) { return NULL; }
-gboolean expose(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
+gboolean expose(GtkWidget *widget, gpointer data, gpointer user_data)
 {
 	GtkAllocation alloc;
 	gtk_widget_get_allocation(widget, &alloc);
@@ -50,7 +50,7 @@ gpointer setup(GtkWidget *widget)
 			glconfig, NULL, TRUE, GDK_GL_RGBA_TYPE);
 	return NULL;
 }
-gboolean expose(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
+gboolean expose(GtkWidget *widget, gpointer data, gpointer user_data)
 {
 	GtkAllocation alloc;
 	gtk_widget_get_allocation(widget, &alloc);
@@ -110,7 +110,7 @@ gpointer setup(GtkWidget *widget)
 
 	return context;
 }
-gboolean expose(GtkWidget *widget, GdkEventExpose *event, GLXContext context)
+gboolean expose(GtkWidget *widget, gpointer data, GLXContext context)
 {
 	/* Make current */
 	Display     *xdisplay = GDK_SCREEN_XDISPLAY(gdk_screen_get_default());
@@ -168,7 +168,7 @@ gpointer setup(GtkWidget *widget)
 	gtk_widget_set_double_buffered(widget, FALSE);
 	return FALSE;
 }
-gboolean expose(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
+gboolean expose(GtkWidget *widget, gpointer data, gpointer user_data)
 {
 	GtkWidget *toplevel = gtk_widget_get_toplevel(widget);
 	GdkWindow *window   = gtk_widget_get_window(widget);
@@ -270,7 +270,7 @@ gboolean configure(GtkWidget *widget, GdkEventConfigure *event, NSOpenGLContext 
 	[ctx  update];
 	return FALSE;
 }
-gboolean expose(GtkWidget *widget, GdkEventExpose *event, NSOpenGLContext *ctx)
+gboolean expose(GtkWidget *widget, gpointer data, NSOpenGLContext *ctx)
 {
 	gdk_window_ensure_native(gtk_widget_get_window(widget));
 
@@ -304,7 +304,7 @@ gboolean expose(GtkWidget *widget, GdkEventExpose *event, NSOpenGLContext *ctx)
  ****************************/
 #else
 gpointer setup(GtkWidget *widget) { return NULL; }
-gboolean expose(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
+gboolean expose(GtkWidget *widget, gpointer data, gpointer user_data)
 {
 	g_message("unimplemented");
 	return FALSE;

@@ -80,7 +80,7 @@ gboolean expose(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
 #include <gdk/gdkx.h>
 void realize(GtkWidget *widget, gpointer user_data)
 {
-      gdk_window_ensure_native(gtk_widget_get_window(widget));
+	gdk_window_ensure_native(gtk_widget_get_window(widget));
 }
 gpointer setup(GtkWidget *widget)
 {

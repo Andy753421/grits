@@ -1,6 +1,7 @@
 *.o
 *.so
 *.exe
+gl/gl
 info/info
 interp/interp
 plugin/teapot

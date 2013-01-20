@@ -29,6 +29,10 @@ struct CacheState {
 	GtkWidget *progress;
 };
 
+struct LoadData {
+	GtkImage  *image;
+	GdkPixbuf *pixbuf;
+};
 
 void chunk_callback(gsize cur, gsize total, gpointer _state)
 {
@@ -47,6 +51,22 @@ void chunk_callback(gsize cur, gsize total, gpointer _state)
 		gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(state->progress), (gdouble)cur/total);
 }
 
+gboolean load_callback(gpointer _data)
+{
+	struct LoadData *data = _data;
+	gtk_image_set_from_pixbuf(GTK_IMAGE(data->image), data->pixbuf);
+	g_free(data);
+	return FALSE;
+}
+
+void load_image(GtkImage *image, GdkPixbuf *pixbuf)
+{
+	struct LoadData *data = g_new0(struct LoadData, 1);
+	data->image  = image;
+	data->pixbuf = pixbuf;
+	g_idle_add(load_callback, data);
+}
+
 gpointer do_bmng_cache(gpointer _image)
 {
 	GtkImage *image = _image;
@@ -63,9 +83,7 @@ gpointer do_bmng_cache(gpointer _image)
 
 	g_message("Loading bmng image: [%s]", path);
 	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(path, NULL);
-	gdk_threads_enter();
-	gtk_image_set_from_pixbuf(GTK_IMAGE(image), pixbuf);
-	gdk_threads_leave();
+	load_image(GTK_IMAGE(image), pixbuf);
 
 	g_message("Cleaning bmng up");
 	grits_wms_free(bmng_wms);
@@ -89,9 +107,7 @@ gpointer do_osm_cache(gpointer _image)
 
 	g_message("Loading osm image: [%s]", path);
 	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(path, NULL);
-	gdk_threads_enter();
-	gtk_image_set_from_pixbuf(GTK_IMAGE(image), pixbuf);
-	gdk_threads_leave();
+	load_image(GTK_IMAGE(image), pixbuf);
 
 	g_message("Cleaning osm up");
 	grits_wms_free(osm_wms);
@@ -114,9 +130,7 @@ gpointer do_osm2_cache(gpointer _image)
 
 	g_message("Loading osm2 image: [%s]", path);
 	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(path, NULL);
-	gdk_threads_enter();
-	gtk_image_set_from_pixbuf(GTK_IMAGE(image), pixbuf);
-	gdk_threads_leave();
+	load_image(GTK_IMAGE(image), pixbuf);
 
 	g_message("Cleaning osm2 up");
 	grits_tms_free(osm2_tms);
@@ -134,7 +148,6 @@ gboolean key_press_cb(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 
 int main(int argc, char **argv)
 {
-	gdk_threads_init();
 	gtk_init(&argc, &argv);
 
 	GtkWidget *win        = gtk_window_new(GTK_WINDOW_TOPLEVEL);

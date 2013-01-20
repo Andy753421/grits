@@ -65,14 +65,12 @@ static void load_plugin(GritsPlugins *plugins, gchar *name,
  ***********/
 int main(int argc, char **argv)
 {
-	gdk_threads_init();
 	gtk_init(&argc, &argv);
 
 	prefs   = grits_prefs_new(NULL, NULL);
 	plugins = grits_plugins_new(g_getenv("GRITS_PLUGIN_PATH"), prefs);
 	viewer  = grits_opengl_new(plugins, prefs);
 
-	gdk_threads_enter();
 	GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 	GtkWidget *vbox   = gtk_vbox_new(FALSE, 0);
 	GtkWidget *config = gtk_notebook_new();
@@ -98,7 +96,6 @@ int main(int argc, char **argv)
 
 	gtk_widget_show_all(config);
 	gtk_main();
-	gdk_threads_leave();
 
 	gdk_display_close(gdk_display_get_default());
 

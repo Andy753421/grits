@@ -166,14 +166,11 @@ static void restore_states(GtkUIManager *manager)
 
 int main(int argc, char **argv)
 {
-	gdk_threads_init();
 	gtk_init(&argc, &argv);
 
 	prefs   = grits_prefs_new(NULL, NULL);
 	plugins = grits_plugins_new(g_getenv("GRITS_PLUGIN_PATH"), prefs);
 	viewer  = grits_opengl_new(plugins, prefs);
-
-	gdk_threads_enter();
 
 	GtkWidget    *notebook = NULL;
 	GtkUIManager *manager  = setup_actions();
@@ -188,8 +185,6 @@ int main(int argc, char **argv)
 	grits_plugins_free(plugins);
 	g_object_unref(prefs);
 
-	gdk_threads_leave();
-
 	g_debug("GritsDemo: main - refs=%d,%d",
 			G_OBJECT(manager)->ref_count,
 			G_OBJECT(window)->ref_count);
@@ -200,7 +195,7 @@ int main(int argc, char **argv)
 	plugins = NULL;
 	viewer  = NULL;
 
-	gdk_display_close(gdk_display_get_default());
+	//gdk_display_close(gdk_display_get_default());
 
 	return 0;
 }

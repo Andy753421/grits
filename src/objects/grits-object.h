@@ -36,11 +36,14 @@
 #define GRITS_SKIP_CENTER  (1<<2)
 #define GRITS_SKIP_STATE   (1<<3)
 
+/* Mouse move threshold for clicking */
+#define GRITS_CLICK_THRESHOLD 8
+
 /* Picking states */
 typedef struct {
 	guint picked   : 1;
 	guint selected : 1;
-	guint clicking : 1;
+	guint clicking : 6;
 } GritsState;
 
 typedef struct _GritsObject      GritsObject;

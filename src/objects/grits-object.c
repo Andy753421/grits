@@ -211,11 +211,13 @@ gboolean grits_object_event(GritsObject *object, GdkEvent *event)
 
 	/* Handle button click */
 	if (sig == SIG_BUTTON_PRESS)
-		object->state.clicking = TRUE;
+		object->state.clicking  = GRITS_CLICK_THRESHOLD;
+	if (sig == SIG_MOTION && object->state.clicking)
+		object->state.clicking -= 1;
 	if (sig == SIG_BUTTON_RELEASE && object->state.clicking)
 		g_signal_emit(object, signals[SIG_CLICKED], 0, event, &rval);
-	if (sig == SIG_BUTTON_RELEASE || sig == SIG_MOTION)
-		object->state.clicking = FALSE;
+	if (sig == SIG_BUTTON_RELEASE)
+		object->state.clicking  = 0;
 
 	/* Emit this signal */
 	if (rval == FALSE) {

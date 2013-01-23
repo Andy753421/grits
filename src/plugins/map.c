@@ -190,8 +190,8 @@ static void grits_plugin_map_dispose(GObject *gobject)
 	if (map->viewer) {
 		GritsViewer *viewer = map->viewer;
 		g_signal_handler_disconnect(viewer, map->sigid);
-		soup_session_abort(map->tms->http->soup);
-		//soup_session_abort(map->wms->http->soup);
+		grits_http_abort(map->tms->http);
+		//grits_http_abort(map->wms->http);
 		g_thread_pool_free(map->threads, TRUE, TRUE);
 		map->viewer = NULL;
 		grits_viewer_remove(viewer, GRITS_OBJECT(map->tiles));

@@ -170,7 +170,7 @@ static void grits_plugin_sat_dispose(GObject *gobject)
 	if (sat->viewer) {
 		GritsViewer *viewer = sat->viewer;
 		g_signal_handler_disconnect(viewer, sat->sigid);
-		soup_session_abort(sat->wms->http->soup);
+		grits_http_abort(sat->wms->http);
 		g_thread_pool_free(sat->threads, TRUE, TRUE);
 		sat->viewer = NULL;
 		grits_viewer_remove(viewer, GRITS_OBJECT(sat->tiles));

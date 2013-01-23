@@ -266,7 +266,7 @@ static void grits_plugin_elev_dispose(GObject *gobject)
 	if (elev->viewer) {
 		GritsViewer *viewer = elev->viewer;
 		g_signal_handler_disconnect(viewer, elev->sigid);
-		soup_session_abort(elev->wms->http->soup);
+		grits_http_abort(elev->wms->http);
 		g_thread_pool_free(elev->threads, TRUE, TRUE);
 		elev->viewer = NULL;
 		if (LOAD_BIL)

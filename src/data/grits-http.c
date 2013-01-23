@@ -59,6 +59,19 @@ GritsHttp *grits_http_new(const gchar *prefix)
 }
 
 /**
+ * grits_http_abort:
+ * @http: the #GritsHttp to abort
+ *
+ * Cancels any pending requests and prevents new requests.
+ */
+void grits_http_abort(GritsHttp *http)
+{
+	g_debug("GritsHttp: abort - %s", http->prefix);
+	http->aborted = TRUE;
+	soup_session_abort(http->soup);
+}
+
+/**
  * grits_http_free:
  * @http: the #GritsHttp to free
  *
@@ -67,7 +80,6 @@ GritsHttp *grits_http_new(const gchar *prefix)
 void grits_http_free(GritsHttp *http)
 {
 	g_debug("GritsHttp: free - %s", http->prefix);
-	soup_session_abort(http->soup);
 	g_object_unref(http->soup);
 	g_free(http->prefix);
 	g_free(http);
@@ -148,6 +160,10 @@ gchar *grits_http_fetch(GritsHttp *http, const gchar *uri, const char *local,
 		GritsCacheType mode, GritsChunkCallback callback, gpointer user_data)
 {
 	g_debug("GritsHttp: fetch - %s mode=%d", local, mode);
+	if (http->aborted) {
+		g_debug("GritsPluginSat: _load_tile_thread - aborted");
+		return NULL;
+	}
 	gchar *path = _get_cache_path(http, local);
 
 	/* Unlink the file if we're refreshing it */

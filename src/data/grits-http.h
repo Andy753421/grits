@@ -26,9 +26,12 @@
 typedef struct _GritsHttp {
 	SoupSession *soup;
 	gchar *prefix;
+	gboolean aborted;
 } GritsHttp;
 
 GritsHttp *grits_http_new(const gchar *prefix);
+
+void grits_http_abort(GritsHttp *http);
 
 void grits_http_free(GritsHttp *http);
 

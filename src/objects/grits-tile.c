@@ -246,6 +246,13 @@ void grits_tile_update(GritsTile *tile, GritsPoint *eye,
 				load_func, user_data);
 }
 
+static void _grits_tile_queue_draw(GritsTile *tile)
+{
+	while (!GRITS_OBJECT(tile)->viewer && tile->parent)
+		tile = tile->parent;
+	grits_object_queue_draw(GRITS_OBJECT(tile));
+}
+
 /**
  * grits_tile_load_pixels:
  * @tile:   the tile to load data into
@@ -276,7 +283,8 @@ gboolean grits_tile_load_pixels(GritsTile *tile, guchar *pixels,
 	tile->pixels = pixels;
 
 	/* Queue OpenGL texture load/draw */
-	grits_object_queue_draw(GRITS_OBJECT(tile));
+	_grits_tile_queue_draw(tile);
+
 	return TRUE;
 }
 
@@ -301,7 +309,7 @@ gboolean grits_tile_load_pixbuf(GritsTile *tile, GdkPixbuf *pixbuf)
 	tile->alpha  = gdk_pixbuf_get_has_alpha(pixbuf);
 
 	/* Queue OpenGL texture load/draw */
-	grits_object_queue_draw(GRITS_OBJECT(tile));
+	_grits_tile_queue_draw(tile);
 
 	return TRUE;
 }
@@ -329,7 +337,7 @@ gboolean grits_tile_load_file(GritsTile *tile, const gchar *file)
 	tile->alpha  = gdk_pixbuf_get_has_alpha(tile->pixbuf);
 
 	/* Queue OpenGL texture load/draw */
-	grits_object_queue_draw(GRITS_OBJECT(tile));
+	_grits_tile_queue_draw(tile);
 
 	return TRUE;
 }

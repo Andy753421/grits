@@ -33,6 +33,9 @@ grits_include_HEADERS = \
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = grits.pc
 
+# GTK 2/3 compatability
+EXTRA_DIST = compat.h
+
 # Library
 lib_LTLIBRARIES = libgrits.la
 

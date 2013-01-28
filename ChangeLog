@@ -1,6 +1,12 @@
 See the Git log for detailed information
 http://pileus.org/git/?p=grits
 
+v0.8 (2013/01/28):
+  * Change website
+  * Add compass rose
+  * Improvie mouse support for objects
+  * Initial support for GTK 3
+
 v0.7 (2012/02/15):
   * Add high resolution OpenStreetMap maps
   * Allow images in GritsTile

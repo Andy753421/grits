@@ -1,6 +1,6 @@
-m4_define([grits_release], [0.7])
-m4_define([grits_version], [4:0:0])
-m4_define([grits_subdir],  [grits4])
+m4_define([grits_release], [0.8])
+m4_define([grits_version], [5:0:0])
+m4_define([grits_subdir],  [grits5])
 
 # Init and options
 AC_INIT([grits], [grits_release], [andy753421@gmail.com])

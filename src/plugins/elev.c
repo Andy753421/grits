@@ -272,8 +272,7 @@ static void grits_plugin_elev_dispose(GObject *gobject)
 		if (LOAD_BIL)
 			grits_viewer_clear_height_func(viewer);
 		if (LOAD_TEX)
-			grits_viewer_remove(viewer, GRITS_OBJECT(elev->tiles));
-		g_object_unref(elev->tiles);
+			grits_object_destroy_pointer(&elev->tiles);
 		g_object_unref(viewer);
 	}
 	G_OBJECT_CLASS(grits_plugin_elev_parent_class)->dispose(gobject);

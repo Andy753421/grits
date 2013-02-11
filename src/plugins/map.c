@@ -194,8 +194,7 @@ static void grits_plugin_map_dispose(GObject *gobject)
 		//grits_http_abort(map->wms->http);
 		g_thread_pool_free(map->threads, TRUE, TRUE);
 		map->viewer = NULL;
-		grits_viewer_remove(viewer, GRITS_OBJECT(map->tiles));
-		g_object_unref(map->tiles);
+		grits_object_destroy_pointer(&map->tiles);
 		g_object_unref(viewer);
 	}
 	G_OBJECT_CLASS(grits_plugin_map_parent_class)->dispose(gobject);

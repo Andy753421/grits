@@ -102,6 +102,30 @@ void grits_object_queue_draw(GritsObject *object);
 void grits_object_set_cursor(GritsObject *object, GdkCursorType cursor);
 
 /**
+ * grits_object_destroy:
+ * @object: The #GritsObject to destroy
+ *
+ * Removes the widget from it's current viewer (if it has one) and decrements
+ * it's reference count.
+ */
+void grits_object_destroy(GritsObject *object);
+
+/**
+ * grits_object_destroy_pointer:
+ * @object: The pointer to the #GritsObject to destroy
+ *
+ * This functions the same as grits_object_destroy, except that the location of
+ * the object is set to null before proceeding.
+ */
+#define grits_object_destroy_pointer(object) ({           \
+	if (*object) {                                    \
+		GritsObject *tmp = GRITS_OBJECT(*object); \
+		*object = NULL;                           \
+		grits_object_destroy(tmp);                \
+	}                                                 \
+})
+
+/**
  * grits_object_center:
  * @object: The #GritsObject to get the center of
  * 

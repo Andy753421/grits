@@ -173,8 +173,7 @@ static void grits_plugin_sat_dispose(GObject *gobject)
 		grits_http_abort(sat->wms->http);
 		g_thread_pool_free(sat->threads, TRUE, TRUE);
 		sat->viewer = NULL;
-		grits_viewer_remove(viewer, GRITS_OBJECT(sat->tiles));
-		g_object_unref(sat->tiles);
+		grits_object_destroy_pointer(&sat->tiles);
 		g_object_unref(viewer);
 	}
 	G_OBJECT_CLASS(grits_plugin_sat_parent_class)->dispose(gobject);

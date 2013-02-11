@@ -172,6 +172,13 @@ void grits_object_set_cursor(GritsObject *object, GdkCursorType cursor)
 	object->cursor = gdk_cursor_new(cursor);
 }
 
+void grits_object_destroy(GritsObject *object)
+{
+	if (object->viewer)
+		grits_viewer_remove(object->viewer, object);
+	g_object_unref(object);
+}
+
 /* Event handling */
 void grits_object_pick(GritsObject *object, GritsOpenGL *opengl)
 {

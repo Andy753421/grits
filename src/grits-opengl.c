@@ -73,9 +73,9 @@ static void _set_projection(GritsOpenGL *opengl)
 	double width  = alloc.width;
 	double height = alloc.height;
 	double ang    = atan((height/2)/FOV_DIST)*2;
-	double atmos  = 100000;
-	double near   = MAX(elev*0.75 - atmos, 50); // View 100km of atmosphere
-	double far    = elev + 2*EARTH_R + atmos;   // on both sides of the earth
+	double atmos  = 10000;
+	double near   = MAX(elev*0.75 - atmos, 50);  // View 100km of atmosphere
+	double far    = elev + EARTH_R*1.25 + atmos; // a bit past the cenrt of the earth
 
 	glViewport(0, 0, width, height);
 	gluPerspective(rad2deg(ang), width/height, near, far);

@@ -41,11 +41,6 @@ AS_IF([test "$enable_gtk3" = "yes"],
 	[GTK_VERSION=gtk+-2.0])
 AC_SUBST(GTK_VERSION)
 
-# Check for glut for example plugin
-AC_CHECK_LIB(glut, glutSolidTeapot, GLUT_LIBS="-lglut")
-AM_CONDITIONAL(HAVE_GLUT, test "$GLUT_LIBS" != "")
-AC_SUBST(GLUT_LIBS)
-
 # Test for windowing system
 case "${host}" in
 	*mingw32*) SYS="WIN" ;;

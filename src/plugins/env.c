@@ -28,10 +28,6 @@
 
 #include <grits.h>
 
-#ifdef HAVE_GLUT
-#include <GL/glut.h>
-#endif
-
 #include "env.h"
 
 /***********
@@ -156,37 +152,6 @@ static void compass_draw_compass(gdouble scale)
 	}
 }
 
-static gboolean compass_draw_teapot(gdouble scale, GritsPluginEnv *env)
-{
-	static int teatime = 0;
-#ifdef HAVE_GLUT
-	static int init, argc; char *argv[] = {"", NULL};
-	if (!init) {
-		teatime = grits_prefs_get_boolean(env->prefs, "grits/teatime", NULL);
-		glutInit(&argc, argv);
-		init = 1;
-		g_message("teatime=%d", teatime);
-	}
-
-	if (teatime) {
-		/* Setup lighting */
-		float light_ambient[]  = {0.1f, 0.1f, 0.0f, 1.0f};
-		float light_diffuse[]  = {0.9f, 0.9f, 0.9f, 1.0f};
-		float light_position[] = {-50.0f, -40.0f, -80.0f, 1.0f};
-		glLightfv(GL_LIGHT0, GL_AMBIENT,  light_ambient);
-		glLightfv(GL_LIGHT0, GL_DIFFUSE,  light_diffuse);
-		glLightfv(GL_LIGHT0, GL_POSITION, light_position);
-
-		/* Draw teapot */
-		glRotatef(-90, 0, 0, 1);
-		glRotatef(-90, 1, 0, 0);
-		glColor4f(0.9, 0.9, 0.7, 1.0);
-		glutSolidTeapot(scale * 0.60);
-	}
-#endif
-	return teatime;
-}
-
 static void compass_expose(GritsCallback *compass, GritsOpenGL *opengl, gpointer _env)
 {
 	GritsPluginEnv *env = GRITS_PLUGIN_ENV(_env);
@@ -213,8 +178,7 @@ static void compass_expose(GritsCallback *compass, GritsOpenGL *opengl, gpointer
 	x = CLAMP(x, -66, 66);;
 	glRotatef(x, 1, 0, 0);
 	glRotatef(-z, 0, 0, 1);
-	if (!compass_draw_teapot(scale, env))
-		compass_draw_compass(scale);
+	compass_draw_compass(scale);
 }
 
 static gboolean compass_click(GritsCallback *compass, GdkEvent *evnet, GritsViewer *viewer)

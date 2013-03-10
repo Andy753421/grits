@@ -24,15 +24,5 @@ test_la_SOURCES     = test.c test.h
 env_la_CPPFLAGS     = $(AM_CPPFLAGS)
 env_la_LDFLAGS      = $(AM_LDFLAGS)
 
-if HAVE_GLUT
-noinst_LTLIBRARIES  = teapot.la
-teapot_la_SOURCES   = \
-	$(top_srcdir)/examples/plugin/teapot.c \
-	$(top_srcdir)/examples/plugin/teapot.h
-teapot_la_LDFLAGS   = $(AM_LDFLAGS) -lglut -rpath $(libdir) # I hate you libtool
-env_la_CPPFLAGS    += -DHAVE_GLUT
-env_la_LDFLAGS     += -lglut
-endif
-
 test:
 	( cd ../; make test )
